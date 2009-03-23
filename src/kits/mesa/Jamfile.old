@@ -1,0 +1,408 @@
+SubDir HAIKU_TOP src kits opengl mesa ;
+
+SetSubDirSupportedPlatformsBeOSCompatible ;
+
+if $(TARGET_PLATFORM) != haiku {
+	UseHeaders [ FDirName $(HAIKU_TOP) headers os opengl ] : true ;
+		# We need our not platform one, public GL headers also when not compiling for Haiku.
+}
+
+# Don't compile libmesa.a with debugging.
+DEBUG = 0 ;
+
+UsePrivateHeaders opengl ;
+
+UseHeaders [ FDirName $(SUBDIR) main ] ;
+UseHeaders [ FDirName $(SUBDIR) glapi ] ;
+UseHeaders [ FDirName $(SUBDIR) math ] ;
+UseHeaders [ FDirName $(SUBDIR) tnl ] ;
+UseHeaders [ FDirName $(SUBDIR) shader ] ;
+UseHeaders [ FDirName $(SUBDIR) shader grammar ] ;
+UseHeaders [ FDirName $(SUBDIR) shader slang ] ;
+UseHeaders [ FDirName $(SUBDIR) state_tracker ] ;
+UseHeaders [ FDirName $(SUBDIR) swrast ] ;
+UseHeaders [ FDirName $(SUBDIR) swrast_setup ] ;
+UseHeaders [ FDirName $(SUBDIR) vbo ] ;
+
+SEARCH_SOURCE += [ FDirName $(SUBDIR) drivers common ] ;
+SEARCH_SOURCE += [ FDirName $(SUBDIR) glapi ] ;
+SEARCH_SOURCE += [ FDirName $(SUBDIR) main ] ;
+SEARCH_SOURCE += [ FDirName $(SUBDIR) math ] ;
+SEARCH_SOURCE += [ FDirName $(SUBDIR) shader ] ;
+SEARCH_SOURCE += [ FDirName $(SUBDIR) shader grammar ] ;
+SEARCH_SOURCE += [ FDirName $(SUBDIR) shader slang ] ;
+SEARCH_SOURCE += [ FDirName $(SUBDIR) state_tracker ] ;
+SEARCH_SOURCE += [ FDirName $(SUBDIR) swrast ] ;
+SEARCH_SOURCE += [ FDirName $(SUBDIR) swrast_setup ] ;
+SEARCH_SOURCE += [ FDirName $(SUBDIR) tnl ] ;
+SEARCH_SOURCE += [ FDirName $(SUBDIR) vbo ] ;
+SEARCH_SOURCE += [ FDirName $(SUBDIR) $(TARGET_ARCH) ] ;
+
+UsePublicObjectHeaders gen_matypes : opengl ;
+
+BuildPlatformMain gen_matypes :
+	gen_matypes.c ;
+
+rule MkMaTypes
+{
+	MakeLocateArch $(<) ;
+	Depends $(<) : gen_matypes ;
+	MkMaTypes1 $(<) : gen_matypes ;
+	LocalClean clean : $(<) ;
+}
+
+actions MkMaTypes1
+{
+	$(HOST_ADD_BUILD_COMPATIBILITY_LIB_DIR);
+	$(2) > $(1) ;
+}
+
+
+{
+	local defines ;
+	defines = BEOS_THREADS GNU_ASSEMBLER ;
+
+	if $(TARGET_ARCH) = x86 {
+		defines += USE_X86_ASM USE_MMX_ASM USE_3DNOW_ASM USE_SSE_ASM ;
+	} else {
+		# Not yet supported, as current Mesa3D PPC assembly is Linux-dependent!
+		# defines += USE_PPC_ASM ;
+	}
+
+	defines = [ FDefines $(defines) ] ;
+	SubDirCcFlags $(defines) ;
+	SubDirC++Flags $(defines) ;
+	SubDirAsFlags $(defines) ;
+}
+
+local arch_sources ;
+if $(TARGET_ARCH) = x86 {
+
+	MkMaTypes <mesa>matypes.h ;
+
+	arch_sources = 
+		common_x86.c
+		common_x86_asm.S
+
+		x86_xform.c
+		x86_xform2.S
+		x86_xform3.S
+		x86_xform4.S
+		x86_cliptest.S
+		mmx_blend.S
+		3dnow.c
+		3dnow_xform1.S
+		3dnow_xform2.S
+		3dnow_xform3.S
+		3dnow_xform4.S
+		3dnow_normal.S
+		sse.c
+		sse_xform1.S
+		sse_xform2.S
+		sse_xform3.S
+		sse_xform4.S
+		sse_normal.S
+		read_rgba_span_x86.S
+
+		t_vertex_sse.c
+
+		x86sse.c
+		;
+
+	Includes [ FGristFiles $(arch_sources) ] : <mesa>matypes.h ;
+
+	SEARCH_SOURCE += [ FDirName $(SUBDIR) x86 rtasm ] ;
+
+} else if $(TARGET_ARCH) = ppc {
+
+	arch_sources = 
+		common_ppc.c
+		t_vtx_generic.c
+		;
+
+} else if $(TARGET_ARCH) = sparc {
+
+	arch_sources = 
+		sparc.c 
+		t_vtx_generic.c 
+		;
+
+} else {
+	arch_sources = t_vtx_generic.c ;
+}
+
+
+StaticLibrary libmesa.a : 
+
+	# main
+	api_arrayelt.c
+	api_loopback.c
+	api_noop.c
+	api_validate.c
+	accum.c
+	api_exec.c
+	arrayobj.c
+	attrib.c
+	blend.c
+	bufferobj.c
+	buffers.c
+	clear.c
+	clip.c
+	colortab.c
+	context.c
+	convolve.c
+	cpuinfo.c
+	debug.c
+	depth.c
+	depthstencil.c
+	dlist.c
+	dlopen.c
+	drawpix.c
+	driverfuncs.c
+	enable.c
+	enums.c
+	eval.c
+	execmem.c
+	extensions.c
+	fbobject.c
+	feedback.c
+	ffvertex_prog.c
+	fog.c
+	framebuffer.c
+	get.c
+	getstring.c
+	hash.c
+	hint.c
+	histogram.c
+	image.c
+	imports.c
+	light.c
+	lines.c
+	matrix.c
+	mipmap.c
+	mm.c
+	multisample.c
+	pixel.c
+	pixelstore.c
+	points.c
+	polygon.c
+	queryobj.c
+	rastpos.c
+	rbadaptors.c
+	readpix.c
+	renderbuffer.c
+	scissor.c
+	shaders.c
+	shared.c
+	state.c
+	stencil.c
+	texcompress.c
+	texcompress_s3tc.c
+	texcompress_fxt1.c
+	texenv.c	
+	texenvprogram.c
+	texformat.c
+	texgen.c
+	teximage.c
+	texobj.c
+	texparam.c
+	texrender.c
+	texstate.c
+	texstore.c
+	varray.c
+	viewport.c
+	vtxfmt.c
+
+	# math
+	m_debug_clip.c
+	m_debug_norm.c
+	m_debug_xform.c
+	m_eval.c
+	m_matrix.c
+	m_translate.c
+	m_vector.c
+	m_xform.c
+
+	# tnl
+	t_context.c
+	t_draw.c
+	t_pipeline.c
+	t_rasterpos.c
+	t_vb_cull.c
+	t_vb_fog.c
+	t_vb_light.c
+	t_vb_normals.c
+	t_vb_points.c
+	t_vb_program.c
+	t_vb_render.c
+	t_vb_texgen.c
+	t_vb_texmat.c
+	t_vb_vertex.c
+	t_vp_build.c
+	t_vertex.c
+	t_vertex_generic.c
+
+	# state_tracker
+#	st_api.c
+#	st_atom_blend.c
+#	st_atom.c
+#	st_atom_clip.c
+#	st_atom_constbuf.c
+#	st_atom_depth.c
+#	st_atom_framebuffer.c
+#	st_atom_pixeltransfer.c
+#	st_atom_rasterizer.c
+#	st_atom_sampler.c
+#	st_atom_scissor.c
+#	st_atom_shader.c
+#	st_atom_stipple.c
+#	st_atom_texture.c
+#	st_atom_viewport.c
+#	st_cb_accum.c
+#	st_cb_bitmap.c
+#	st_cb_blit.c
+#	st_cb_bufferobjects.c
+#	st_cb_clear.c
+#	st_cb_drawpixels.c
+#	st_cb_fbo.c
+#	st_cb_feedback.c
+#	st_cb_flush.c
+#	st_cb_get.c
+#	st_cb_program.c
+#	st_cb_queryobj.c
+#	st_cb_rasterpos.c
+#	st_cb_readpixels.c
+#	st_cb_strings.c
+#	st_cb_texture.c
+#	st_cb_viewport.c
+#	st_context.c
+#	st_debug.c
+#	st_draw.c
+#	st_draw_feedback.c
+#	st_extensions.c
+#	st_format.c
+#	st_framebuffer.c
+#	st_gen_mipmap.c
+#	st_mesa_to_tgsi.c
+#	st_program.c
+#	st_texture.c
+
+	# swrast
+	s_aaline.c
+	s_aatriangle.c
+	s_accum.c
+	s_alpha.c
+	s_atifragshader.c
+	s_bitmap.c
+	s_blend.c
+	s_blit.c
+	s_clear.c
+	s_buffers.c
+	s_copypix.c
+	s_context.c
+	s_depth.c
+	s_drawpix.c
+	s_feedback.c
+	s_fog.c
+	s_fragprog.c
+	s_imaging.c
+	s_lines.c
+	s_logic.c
+	s_masking.c
+	s_points.c
+	s_readpix.c
+	s_span.c
+	s_stencil.c
+	s_texcombine.c
+	s_texfilter.c
+	s_texstore.c
+	s_triangle.c
+	s_zoom.c
+
+	# swrast_setup
+	ss_context.c
+	ss_triangle.c 	
+
+	# shader
+	arbprogparse.c
+	arbprogram.c
+	atifragshader.c
+	nvfragparse.c
+	nvprogram.c
+	nvvertparse.c
+	prog_cache.c
+	prog_execute.c
+	prog_instruction.c
+	prog_noise.c
+	prog_optimize.c
+	prog_parameter.c
+	prog_print.c
+	prog_statevars.c
+	prog_uniform.c
+	program.c
+	programopt.c
+	shader_api.c
+
+	# shader/grammar
+	grammar_mesa.c
+
+	# shader/slang
+	slang_builtin.c
+	slang_codegen.c
+	slang_compile.c
+	slang_compile_function.c
+	slang_compile_operation.c
+	slang_compile_struct.c
+	slang_compile_variable.c
+	slang_emit.c
+	slang_ir.c
+	slang_label.c
+	slang_library_noise.c
+	slang_link.c
+	slang_log.c
+	slang_mem.c
+	slang_preprocess.c
+	slang_print.c
+	slang_simplify.c
+	slang_storage.c
+	slang_typeinfo.c
+	slang_utility.c
+	slang_vartable.c
+
+	# vbo
+	vbo_context.c
+	vbo_exec.c
+	vbo_exec_api.c
+	vbo_exec_array.c
+	vbo_exec_draw.c
+	vbo_exec_eval.c
+	vbo_rebase.c
+	vbo_save.c
+	vbo_save_api.c
+	vbo_save_draw.c
+	vbo_save_loopback.c
+	vbo_split.c
+	vbo_split_copy.c
+	vbo_split_inplace.c
+
+	$(arch_sources)
+
+	# glapi
+	glapi.c
+	glthread.c
+;
+
+
+local arch_sources ;
+if $(TARGET_ARCH) = x86 {
+	# On x86 platform, use the faster GL API dispatching assembly code!
+	arch_sources = glapi_x86.S ;
+} else {
+	# For non-X86 platforms, no assembly code yet.
+	arch_sources = ;
+}
+
+MergeObject <opengl>mesa_arch_$(TARGET_ARCH).o :
+	$(arch_sources)
+;
+

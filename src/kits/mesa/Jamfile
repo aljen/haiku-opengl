@@ -1,0 +1,504 @@
+SubDir HAIKU_TOP src kits opengl mesa ;
+
+SetSubDirSupportedPlatformsBeOSCompatible ;
+
+if $(TARGET_PLATFORM) != haiku {
+	UseHeaders [ FDirName $(HAIKU_TOP) headers os opengl ] : true ;
+		# We need our not platform one, public GL headers also when not compiling for Haiku.
+}
+
+# Don't compile libmesa.a with debugging.
+DEBUG = 0 ;
+
+UsePrivateHeaders opengl ;
+
+UseHeaders [ FDirName $(SUBDIR) main ] ;
+UseHeaders [ FDirName $(SUBDIR) glapi ] ;
+UseHeaders [ FDirName $(SUBDIR) gallium auxiliary ] ;
+UseHeaders [ FDirName $(SUBDIR) gallium include ] ;
+UseHeaders [ FDirName $(SUBDIR) math ] ;
+UseHeaders [ FDirName $(SUBDIR) tnl ] ;
+UseHeaders [ FDirName $(SUBDIR) shader ] ;
+UseHeaders [ FDirName $(SUBDIR) shader grammar ] ;
+UseHeaders [ FDirName $(SUBDIR) shader slang ] ;
+UseHeaders [ FDirName $(SUBDIR) state_tracker ] ;
+UseHeaders [ FDirName $(SUBDIR) swrast ] ;
+UseHeaders [ FDirName $(SUBDIR) swrast_setup ] ;
+UseHeaders [ FDirName $(SUBDIR) vbo ] ;
+
+SEARCH_SOURCE += [ FDirName $(SUBDIR) drivers common ] ;
+SEARCH_SOURCE += [ FDirName $(SUBDIR) glapi ] ;
+SEARCH_SOURCE += [ FDirName $(SUBDIR) main ] ;
+SEARCH_SOURCE += [ FDirName $(SUBDIR) math ] ;
+SEARCH_SOURCE += [ FDirName $(SUBDIR) shader ] ;
+SEARCH_SOURCE += [ FDirName $(SUBDIR) shader grammar ] ;
+SEARCH_SOURCE += [ FDirName $(SUBDIR) shader slang ] ;
+SEARCH_SOURCE += [ FDirName $(SUBDIR) state_tracker ] ;
+SEARCH_SOURCE += [ FDirName $(SUBDIR) swrast ] ;
+SEARCH_SOURCE += [ FDirName $(SUBDIR) swrast_setup ] ;
+SEARCH_SOURCE += [ FDirName $(SUBDIR) tnl ] ;
+SEARCH_SOURCE += [ FDirName $(SUBDIR) vbo ] ;
+SEARCH_SOURCE += [ FDirName $(SUBDIR) gallium auxiliary cso_cache ] ;
+SEARCH_SOURCE += [ FDirName $(SUBDIR) gallium auxiliary draw ] ;
+SEARCH_SOURCE += [ FDirName $(SUBDIR) gallium auxiliary gallivm ] ;
+SEARCH_SOURCE += [ FDirName $(SUBDIR) gallium auxiliary indices ] ;
+SEARCH_SOURCE += [ FDirName $(SUBDIR) gallium auxiliary pipebuffer ] ;
+SEARCH_SOURCE += [ FDirName $(SUBDIR) gallium auxiliary rtasm ] ;
+SEARCH_SOURCE += [ FDirName $(SUBDIR) gallium auxiliary sct ] ;
+SEARCH_SOURCE += [ FDirName $(SUBDIR) gallium auxiliary tgsi ] ;
+SEARCH_SOURCE += [ FDirName $(SUBDIR) gallium auxiliary translate ] ;
+SEARCH_SOURCE += [ FDirName $(SUBDIR) gallium auxiliary util ] ;
+SEARCH_SOURCE += [ FDirName $(SUBDIR) $(TARGET_ARCH) ] ;
+
+UsePublicObjectHeaders gen_matypes : opengl ;
+
+BuildPlatformMain gen_matypes :
+	gen_matypes.c ;
+
+rule MkMaTypes
+{
+	MakeLocateArch $(<) ;
+	Depends $(<) : gen_matypes ;
+	MkMaTypes1 $(<) : gen_matypes ;
+	LocalClean clean : $(<) ;
+}
+
+actions MkMaTypes1
+{
+	$(HOST_ADD_BUILD_COMPATIBILITY_LIB_DIR);
+	$(2) > $(1) ;
+}
+
+
+{
+	local defines ;
+	defines = BEOS_THREADS GNU_ASSEMBLER HAVE_POSIX_MEMALIGN ;
+
+	if $(TARGET_ARCH) = x86 {
+		defines += USE_X86_ASM USE_MMX_ASM USE_3DNOW_ASM USE_SSE_ASM ;
+	} else {
+		# Not yet supported, as current Mesa3D PPC assembly is Linux-dependent!
+		# defines += USE_PPC_ASM ;
+	}
+
+	defines = [ FDefines $(defines) ] ;
+	SubDirCcFlags $(defines) ;
+	SubDirC++Flags $(defines) ;
+	SubDirAsFlags $(defines) ;
+}
+
+local arch_sources ;
+if $(TARGET_ARCH) = x86 {
+
+	MkMaTypes <mesa>matypes.h ;
+
+	arch_sources = 
+		common_x86.c
+		common_x86_asm.S
+
+		glapi_x86.S
+
+		x86_xform.c
+		x86_xform2.S
+		x86_xform3.S
+		x86_xform4.S
+		x86_cliptest.S
+		mmx_blend.S
+		3dnow.c
+		3dnow_xform1.S
+		3dnow_xform2.S
+		3dnow_xform3.S
+		3dnow_xform4.S
+		3dnow_normal.S
+		sse.c
+		sse_xform1.S
+		sse_xform2.S
+		sse_xform3.S
+		sse_xform4.S
+		sse_normal.S
+		read_rgba_span_x86.S
+
+		t_vertex_sse.c
+
+		x86sse.c
+		;
+
+	Includes [ FGristFiles $(arch_sources) ] : <mesa>matypes.h ;
+
+	SEARCH_SOURCE += [ FDirName $(SUBDIR) x86 rtasm ] ;
+
+} else if $(TARGET_ARCH) = ppc {
+
+	arch_sources = 
+		common_ppc.c
+		t_vtx_generic.c
+		;
+
+} else if $(TARGET_ARCH) = sparc {
+
+	arch_sources = 
+		sparc.c 
+		t_vtx_generic.c 
+		;
+
+} else {
+	arch_sources = t_vtx_generic.c ;
+}
+
+
+StaticLibrary libmesa.a : 
+
+	# main
+	api_arrayelt.c
+	api_exec.c
+	api_loopback.c
+	api_noop.c
+	api_validate.c
+	accum.c
+	attrib.c
+	arrayobj.c
+	blend.c
+	bufferobj.c
+	buffers.c
+	clear.c
+	clip.c
+	colortab.c
+	context.c
+	convolve.c
+	cpuinfo.c
+	debug.c
+	depth.c
+	depthstencil.c
+	dlist.c
+	dlopen.c
+	drawpix.c
+	enable.c
+	enums.c
+	eval.c
+	execmem.c
+	extensions.c
+	fbobject.c
+	feedback.c
+	ffvertex_prog.c
+	fog.c
+	framebuffer.c
+	get.c
+	getstring.c
+	hash.c
+	hint.c
+	histogram.c
+	image.c
+	imports.c
+	light.c
+	lines.c
+	matrix.c
+	mipmap.c
+	mm.c
+	multisample.c
+	pixel.c
+	pixelstore.c
+	points.c
+	polygon.c
+	queryobj.c
+	rastpos.c
+	rbadaptors.c
+	readpix.c
+	renderbuffer.c
+	scissor.c
+	shaders.c
+	shared.c
+	state.c
+	stencil.c
+	texcompress.c
+	texcompress_s3tc.c
+	texcompress_fxt1.c
+	texenv.c
+	texenvprogram.c
+	texformat.c
+	texgen.c
+	teximage.c
+	texobj.c
+	texparam.c
+	texrender.c
+	texstate.c
+	texstore.c
+	varray.c
+	viewport.c
+	vtxfmt.c
+
+	# math
+	m_debug_clip.c
+	m_debug_norm.c
+	m_debug_xform.c
+	m_eval.c
+	m_matrix.c
+	m_translate.c
+	m_vector.c
+	
+	# vbo
+	vbo_context.c
+	vbo_exec.c
+	vbo_exec_api.c
+	vbo_exec_array.c
+	vbo_exec_draw.c
+	vbo_exec_eval.c
+	vbo_rebase.c
+	vbo_split.c
+	vbo_split_copy.c
+	vbo_split_inplace.c
+	vbo_save.c
+	vbo_save_api.c
+	vbo_save_draw.c
+	vbo_save_loopback.c  
+	
+	# state_tracker
+	st_atom.c
+	st_atom_blend.c
+	st_atom_clip.c
+	st_atom_constbuf.c
+	st_atom_depth.c
+	st_atom_framebuffer.c
+	st_atom_pixeltransfer.c
+	st_atom_sampler.c
+	st_atom_scissor.c
+	st_atom_shader.c
+	st_atom_rasterizer.c
+	st_atom_stipple.c
+	st_atom_texture.c
+	st_atom_viewport.c
+	st_cb_accum.c
+	st_cb_bitmap.c
+	st_cb_blit.c
+	st_cb_bufferobjects.c
+	st_cb_clear.c
+	st_cb_flush.c
+	st_cb_get.c
+	st_cb_drawpixels.c
+	st_cb_fbo.c
+	st_cb_feedback.c
+	st_cb_program.c
+	st_cb_queryobj.c
+	st_cb_rasterpos.c
+	st_cb_readpixels.c
+	st_cb_strings.c
+	st_cb_texture.c
+	st_cb_viewport.c
+	st_api.c
+	st_context.c
+	st_debug.c
+	st_draw.c
+	st_draw_feedback.c
+	st_extensions.c
+	st_format.c
+	st_framebuffer.c
+	st_gen_mipmap.c
+	st_mesa_to_tgsi.c
+	st_program.c
+	st_texture.c
+
+	# shader
+	arbprogparse.c
+	arbprogram.c
+	atifragshader.c	
+	nvfragparse.c
+	nvprogram.c
+	nvvertparse.c
+	program.c
+	prog_cache.c
+	prog_execute.c
+	prog_instruction.c
+	prog_noise.c
+	prog_optimize.c
+	prog_parameter.c
+	prog_print.c
+	prog_statevars.c
+	prog_uniform.c
+	programopt.c
+	shader_api.c
+
+	# shader/grammar
+	grammar_mesa.c
+
+	# shader/slang
+	slang_builtin.c
+	slang_codegen.c
+	slang_compile.c
+	slang_compile_function.c
+	slang_compile_operation.c
+	slang_compile_struct.c
+	slang_compile_variable.c
+	slang_emit.c
+	slang_ir.c
+	slang_label.c
+	slang_link.c
+	slang_log.c
+	slang_mem.c
+	slang_preprocess.c
+	slang_print.c
+	slang_simplify.c
+	slang_storage.c
+	slang_typeinfo.c
+	slang_vartable.c
+	slang_utility.c 
+	
+	# glapi
+	glapi.c
+	glapi_getproc.c
+	glthread.c
+
+	# gallium/auxiliary/cso_cache
+	cso_cache.c
+	cso_context.c
+	cso_hash.c
+	
+	# gallium/auxiliary/draw
+	draw_context.c
+	draw_pipe.c
+	draw_pipe_aaline.c
+	draw_pipe_aapoint.c
+	draw_pipe_clip.c
+	draw_pipe_cull.c
+	draw_pipe_flatshade.c
+	draw_pipe_offset.c
+	draw_pipe_pstipple.c
+	draw_pipe_stipple.c
+	draw_pipe_twoside.c
+	draw_pipe_unfilled.c
+	draw_pipe_util.c
+	draw_pipe_validate.c
+	draw_pipe_vbuf.c
+	draw_pipe_wide_line.c
+	draw_pipe_wide_point.c
+	draw_pt.c
+	draw_pt_elts.c
+	draw_pt_emit.c
+	draw_pt_fetch.c
+	draw_pt_fetch_emit.c
+	draw_pt_fetch_shade_emit.c
+	draw_pt_fetch_shade_pipeline.c
+	draw_pt_post_vs.c
+	draw_pt_util.c
+	draw_pt_varray.c
+	draw_pt_vcache.c
+	draw_vertex.c
+	draw_vs.c
+	draw_vs_aos.c
+	draw_vs_aos_io.c
+	draw_vs_aos_machine.c
+	draw_vs_exec.c
+	draw_vs_llvm.c
+	draw_vs_ppc.c
+	draw_vs_sse.c
+	draw_vs_varient.c
+	
+	# gallium/auxiliary/gallivm
+#	gallivm.cpp
+#	gallivm_builtins.cpp
+#	gallivm_cpu.cpp
+#	instructions.cpp
+#	instructionssoa.cpp
+#	llvm_builtins.c
+#	loweringpass.cpp
+#	soabuiltins.c
+#	storage.cpp
+#	storagesoa.cpp
+#	tgsitollvm.cpp
+	
+	# gallium/auxiliary/indices
+#	u_indices.c
+#	u_indices_gen.c
+#	u_unfilled_gen.c
+#	u_unfilled_indices.c
+
+	# gallium/auxiliary/pipebuffer
+	pb_buffer_fenced.c
+	pb_buffer_malloc.c
+	pb_bufmgr_alt.c
+	pb_bufmgr_cache.c
+	pb_bufmgr_debug.c
+	pb_bufmgr_fenced.c
+	pb_bufmgr_mm.c
+	pb_bufmgr_ondemand.c
+	pb_bufmgr_pool.c
+	pb_bufmgr_slab.c
+	pb_validate.c
+
+	# gallium/auxiliary/rtasm
+	rtasm_cpu.c
+	rtasm_execmem.c
+#	rtasm_ppc.c
+#	rtasm_ppc_spe.c
+	rtasm_x86sse.c
+
+	# gallium/auxiliary/sct
+	sct.c
+	usage.c
+
+	# gallium/auxiliary/tgsi
+	tgsi_build.c
+	tgsi_dump.c
+	tgsi_dump_c.c
+	tgsi_exec.c
+	tgsi_info.c
+	tgsi_iterate.c
+	tgsi_parse.c
+	tgsi_ppc.c
+	tgsi_sanity.c
+	tgsi_scan.c
+	tgsi_sse2.c
+	tgsi_text.c
+	tgsi_transform.c
+	tgsi_util.c
+	
+	# gallium/auxiliary/translate
+	translate.c
+	translate_cache.c
+	translate_generic.c
+	translate_sse.c
+	
+	# gallium/auxiliary/util
+	u_bitmask.c
+	u_blit.c
+	u_cache.c
+	u_cpu_detect.c
+	u_debug.c
+	u_debug_memory.c
+	u_debug_profile.c
+	u_debug_stack.c
+	u_draw_quad.c
+	u_gen_mipmap.c
+	u_handle_table.c
+	u_hash.c
+	u_hash_table.c
+	u_keymap.c
+	u_linear.c
+	u_math.c
+	u_mm.c
+	u_rect.c
+	u_simple_screen.c
+	u_simple_shaders.c
+	u_snprintf.c
+	u_stream_stdc.c
+	u_stream_wd.c
+	u_tile.c
+	u_time.c
+	u_timed_winsys.c
+	u_upload_mgr.c
+
+	$(arch_sources)
+;
+
+
+local arch_sources ;
+if $(TARGET_ARCH) = x86 {
+	# On x86 platform, use the faster GL API dispatching assembly code!
+	arch_sources = glapi_x86.S ;
+} else {
+	# For non-X86 platforms, no assembly code yet.
+	arch_sources = ;
+}
+
+MergeObject <opengl>mesa_arch_$(TARGET_ARCH).o :
+	$(arch_sources)
+;
+
