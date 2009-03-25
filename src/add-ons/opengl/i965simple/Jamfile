@@ -1,0 +1,85 @@
+SubDir HAIKU_TOP src add-ons opengl i965simple ;
+
+SetSubDirSupportedPlatformsBeOSCompatible ;
+
+if $(TARGET_PLATFORM) != haiku {
+	UseHeaders [ FDirName $(HAIKU_TOP) headers os opengl ] : true ;
+		# We need our public GL headers also when not compiling for Haiku.
+}
+
+
+{
+	local defines ;
+	defines = BEOS_THREADS GNU_ASSEMBLER ;
+
+	if $(TARGET_ARCH) = x86 {
+		defines += USE_X86_ASM USE_MMX_ASM USE_3DNOW_ASM USE_SSE_ASM ; 
+	} else {
+		# Not yet supported, as current Mesa3D PPC assembly is Linux-dependent!
+		# defines += USE_PPC_ASM ;
+	}
+
+	SubDirC++Flags [ FDefines $(defines) ] ;
+}
+
+UsePrivateHeaders interface opengl ;
+
+UseHeaders [ FDirName $(HAIKU_TOP) src add-ons opengl ] ;
+UseHeaders [ FDirName $(HAIKU_TOP) src kits opengl hgl ] ;
+UseHeaders [ FDirName $(HAIKU_TOP) src kits opengl mesa ] ;
+UseHeaders [ FDirName $(HAIKU_TOP) src kits opengl mesa main ] ;
+UseHeaders [ FDirName $(HAIKU_TOP) src kits opengl mesa gallium include ] ;
+UseHeaders [ FDirName $(HAIKU_TOP) src kits opengl mesa gallium auxiliary ] ;
+UseHeaders [ FDirName $(HAIKU_TOP) src kits opengl mesa glapi ] ;
+UseHeaders [ FDirName $(HAIKU_TOP) src kits opengl mesa tnl ] ;
+UseHeaders [ FDirName $(HAIKU_TOP) src kits opengl mesa x86 ] ;
+UseHeaders [ FDirName $(HAIKU_TOP) src kits opengl mesa ppc ] ;
+
+Addon i965 :
+	i965HardwareRenderer.cpp
+	brw_blit.c
+	brw_flush.c
+	brw_screen.c
+	brw_surface.c
+	brw_cc.c
+	brw_clip.c
+	brw_clip_line.c
+	brw_clip_point.c
+	brw_clip_state.c
+	brw_clip_tri.c
+	brw_clip_util.c
+	brw_context.c
+	brw_curbe.c
+	brw_draw.c
+	brw_draw_upload.c
+	brw_eu.c
+	brw_eu_debug.c
+	brw_eu_emit.c
+	brw_eu_util.c
+	brw_gs.c
+	brw_gs_emit.c
+	brw_gs_state.c
+	brw_misc_state.c
+	brw_sf.c
+	brw_sf_emit.c
+	brw_sf_state.c
+	brw_state.c
+	brw_state_batch.c
+	brw_state_cache.c
+	brw_state_pool.c
+	brw_state_upload.c
+	brw_tex_layout.c
+	brw_urb.c
+	brw_util.c
+	brw_vs.c
+	brw_vs_emit.c
+	brw_vs_state.c
+	brw_wm.c
+	brw_wm_iz.c
+	brw_wm_decl.c
+	brw_wm_glsl.c
+	brw_wm_sampler_state.c
+	brw_wm_state.c
+	brw_wm_surface_state.c
+	: libGL.so libmesa.a be 
+;

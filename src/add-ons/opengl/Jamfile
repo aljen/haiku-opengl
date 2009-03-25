@@ -1,3 +1,4 @@
 SubDir HAIKU_TOP src add-ons opengl ;
 
+SubInclude HAIKU_TOP src add-ons opengl i965simple ;
 SubInclude HAIKU_TOP src add-ons opengl softpipe ;
