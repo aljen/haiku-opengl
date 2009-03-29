@@ -103,7 +103,5 @@ void
 haiku_softpipe_flush_frontbuffer(struct pipe_screen *screen,
 	struct pipe_surface *surface, Bitmap* bitmap);
 
-//extern static struct hsp_winsys hgl_winsys;
-
 #endif /* __HAIKU_SOFTPIPE_WINSYS_H__ */
 

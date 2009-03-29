@@ -89,13 +89,15 @@ hsp_create_layer_context(Bitmap *bitmap, int layerPlane)
 
 	ctx->bitmap = bitmap;
 	ctx->colorSpace = get_bitmap_color_space(bitmap);
+	ctx->draw = NULL;
+	ctx->read = NULL;
 
 	ulong options = hsp_dev->options;
 
 	const GLboolean rgbFlag		= ((options & BGL_INDEX) == 0);
 	const GLboolean alphaFlag	= ((options & BGL_ALPHA) == BGL_ALPHA);
-	const GLboolean dblFlag		= true;					//((options & BGL_DOUBLE) == BGL_DOUBLE);
-	const GLboolean stereoFlag	= false;				// false;
+	const GLboolean dblFlag		= ((options & BGL_DOUBLE) == BGL_DOUBLE);
+	const GLboolean stereoFlag	= false;
 	const GLint depth		= (options & BGL_DEPTH) ? 24 : 0;
 	const GLint stencil		= (options & BGL_STENCIL) ? 8 : 0;
 	const GLint accum		= 0;					// (options & BGL_ACCUM) ? 16 : 0;
@@ -196,16 +198,19 @@ hsp_delete_context(uint64 ctxId)
 		TRACE("%s> found context: %p\n", __FUNCTION__, ctx);
 		GLcontext *glctx = ctx->st->ctx;
 		GET_CURRENT_CONTEXT(glcurctx);
-		struct hsp_framebuffer *fb = NULL;
 
 		if (glcurctx == glctx)
 			st_make_current(NULL, NULL, NULL);
 
-		fb = framebuffer_from_bitmap(ctx->bitmap);
-		if (fb) {
-			TRACE("%s> found context framebuffer, destroying: %p\n",
-				__FUNCTION__, fb);
-			framebuffer_destroy(fb);
+		if (ctx->draw) {
+			TRACE("%s> found context draw framebuffer, destroying: %p\n",
+				__FUNCTION__, ctx->draw);
+			framebuffer_destroy(ctx->draw);
+		}
+		if (ctx->read) {
+			TRACE("%s> found context read framebuffer, destroying: %p\n",
+				__FUNCTION__, ctx->read);
+			framebuffer_destroy(ctx->read);
 		}
 
 		#warning TODO: destroy ctx->bitmap here ?
@@ -263,7 +268,6 @@ hsp_make_current(Bitmap *bitmap, uint64 ctxId)
 	TRACE("%s(bitmap: %p ctxId: %d)\n", __FUNCTION__, bitmap, ctxId);
 	struct hsp_context *ctx = NULL;
 	GET_CURRENT_CONTEXT(glcurctx);
-	struct hsp_framebuffer *fb = NULL;
 	GLuint width = 0;
 	GLuint height = 0;
 	struct hsp_context *curctx;
@@ -304,28 +308,31 @@ hsp_make_current(Bitmap *bitmap, uint64 ctxId)
 			return true;
 	}
 
-	fb = framebuffer_from_bitmap(bitmap);
-
 	if (bitmap != NULL) {
 		get_bitmap_size(bitmap, &width, &height);
 		TRACE("%s> found bitmap: %p with size: %dx%d\n", __FUNCTION__,
 			bitmap, width, height);
 	}
 
-	if (fb == NULL && ctx != NULL && bitmap != NULL) {
+	if (ctx != NULL && bitmap != NULL ) {
 		GLvisual *visual = &ctx->st->ctx->Visual;
-
-		fb = framebuffer_create(bitmap, visual, width /*+ 1*/, height /*+ 1*/);
-		if (fb == NULL) {
-			TRACE("%s> can't create framebuffer for bitmap!\n",
-				__FUNCTION__);
-			return false;
+		if (ctx->draw == NULL) {
+			ctx->draw = framebuffer_create(bitmap, visual, width /*+ 1*/, height /*+ 1*/);
+		}
+		if ((hsp_dev->options & BGL_DOUBLE) == BGL_DOUBLE && ctx->read == NULL) {
+			ctx->read = framebuffer_create(bitmap, visual, width /*+ 1*/, height /*+ 1*/);
 		}
 	}
 
-	if (ctx && fb) {
-		st_make_current(ctx->st, fb->stfb, fb->stfb);
-		framebuffer_resize(fb, width /*+ 1*/, height /*+ 1*/);
+	if (ctx) {
+		if (ctx->draw && ctx->read == NULL) {
+			st_make_current(ctx->st, ctx->draw->stfb, ctx->draw->stfb);
+			framebuffer_resize(ctx->draw, width /*+ 1*/, height /*+ 1*/);
+		} else if (ctx && ctx->draw && ctx->read) {
+			st_make_current(ctx->st, ctx->draw->stfb, ctx->read->stfb);
+			framebuffer_resize(ctx->draw, width /*+ 1*/, height /*+ 1*/);
+			framebuffer_resize(ctx->read, width /*+ 1*/, height /*+ 1*/);
+		}
 		ctx->bitmap = bitmap;
 		ctx->st->pipe->priv = bitmap;
 	} else {

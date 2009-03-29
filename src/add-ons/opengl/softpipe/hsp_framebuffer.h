@@ -35,8 +35,5 @@ framebuffer_destroy(struct hsp_framebuffer *fb);
 void
 framebuffer_resize(struct hsp_framebuffer *fb, GLuint width, GLuint height);
 
-struct hsp_framebuffer*
-framebuffer_from_bitmap(Bitmap *bitmap);
-
 #endif /* __HSP_FRAMEBUFFER_H__ */
 

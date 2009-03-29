@@ -20,6 +20,8 @@ struct hsp_context
 	struct st_context *st;
 	Bitmap *bitmap;
 	color_space colorSpace;
+	struct hsp_framebuffer *draw;
+	struct hsp_framebuffer *read;
 };
 
 #endif /* __HSP_CONTEXT_H__ */

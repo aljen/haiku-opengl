@@ -82,7 +82,7 @@ haiku_softpipe_buffer_create(struct pipe_winsys *winsys, unsigned alignment,
 	buffer->base.usage = usage;
 	buffer->base.size = size;
 
-	buffer->data = align_malloc(size, alignment /*MAX2(alignment, usage)*/);
+	buffer->data = align_malloc(size, alignment);
 
 	return &buffer->base;
 }
@@ -247,19 +247,8 @@ haiku_softpipe_flush_frontbuffer(struct pipe_screen *screen,
 
 	buffer = haiku_softpipe_buffer(texture->buffer);
 
-	//float width = texture->stride[surface->level] / pf_get_size(surface->format);
 	int32 width = surface->width;
-	int32 height = surface->height; //-(surface->height);
-	int32 bits = pf_get_bits(surface->format);
-	int32 bytesPerRow = get_bitmap_bytes_per_row(bitmap);
+	int32 height = surface->height;
 	int32 bitsLength = get_bitmap_bits_length(bitmap);
-	int32 length = width * height * bytesPerRow;
-	TRACE("\twidth = %d, height = %d bpr = %d, length = %d\n", width, height,
-		bytesPerRow, length);
-	get_bitmap_size(bitmap, &width, &height);
-	TRACE("\tbwidth = %d bheight = %d\n", width, height);
-	TRACE("\tstride/size width = %d\n", texture->stride[surface->level] / pf_get_size(surface->format));
-
 	copy_bitmap_bits(bitmap, buffer->data, bitsLength);
 }
-

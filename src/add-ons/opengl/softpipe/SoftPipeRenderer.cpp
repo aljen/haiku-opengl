@@ -119,7 +119,7 @@ void
 SoftPipeRenderer::SwapBuffers(bool vsync)
 {
 //	CALLED();
-	hsp_swap_buffers(fBitmap);
+	hsp_swap_buffers(fContext);
 	if (!fDirectModeEnabled || fInfo == NULL) {
 		GLView()->LockLooper();
 		GLView()->DrawBitmap(fBitmap);

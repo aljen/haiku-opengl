@@ -38,7 +38,7 @@ bool
 hsp_make_current(Bitmap *bitmap, uint64 ctxId);
 
 bool
-hsp_swap_buffers(Bitmap *bitmap);
+hsp_swap_buffers(uint64 ctxId);
 
 hsp_proc
 hsp_get_proc_address(const char *procname);

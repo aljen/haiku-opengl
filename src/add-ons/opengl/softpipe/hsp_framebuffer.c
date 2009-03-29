@@ -15,6 +15,7 @@
 #include "state_tracker/st_public.h"
 #include "hsp_bitmap_wrapper.h"
 #include "hsp_framebuffer.h"
+#include "hsp_context.h"
 #include "hsp_device.h"
 #include "hsp_public.h"
 #include "hsp_winsys.h"
@@ -90,7 +91,7 @@ framebuffer_create(Bitmap *bitmap, GLvisual *visual, GLuint width, GLuint height
 	TRACE("\tstencilBits = %d\n", visual->stencilBits);
 
 	fb->stfb = st_create_framebuffer(visual, colorFormat, depthFormat,
-			stencilFormat, width, height, NULL/*(void*)fb*/);
+			stencilFormat, width, height, (void*)fb);
 	if (!fb->stfb) {
 		TRACE("%s> can't create mesa statetracker framebuffer!\n",
 			__FUNCTION__);
@@ -119,39 +120,31 @@ framebuffer_destroy(struct hsp_framebuffer *fb)
 	}
 }
 
-struct hsp_framebuffer*
-framebuffer_from_bitmap(Bitmap *bitmap)
-{
-	TRACE("%s(bitmap: %p)\n", __FUNCTION__, bitmap);
-	struct hsp_framebuffer *fb = NULL;
-
-	for (fb = fb_head; fb != NULL; fb = fb->next) {
-		if (fb->bitmap == bitmap)
-			return fb;
-	}
-	return NULL;
-}
-
 bool
-hsp_swap_buffers(Bitmap *bitmap)
+hsp_swap_buffers(uint64 ctxId)
 {
-	TRACE("%s(bitmap: %p)\n", __FUNCTION__, bitmap);
+	TRACE("%s(ctxId: %p)\n", __FUNCTION__, ctxId);
+	struct hsp_context *ctx = NULL;
 	struct hsp_framebuffer *fb = NULL;
-	struct pipe_surface *surface; // = NULL;
+	struct pipe_surface *surface;
 
-	fb = framebuffer_from_bitmap(bitmap);
+	pipe_mutex_lock(hsp_dev->mutex);
+	ctx = hsp_lookup_context(ctxId);
+	pipe_mutex_unlock(hsp_dev->mutex);
 
-	if (!fb) {
-		TRACE("%s> framebuffer not found\n", __FUNCTION__);
+	if (ctx == NULL) {
+		TRACE("%s> context not found\n", __FUNCTION__);
 		return false;
 	}
-
+	
+	fb = ctx->draw;
+	
 	st_notify_swapbuffers(fb->stfb);
 
 	st_get_framebuffer_surface(fb->stfb, ST_SURFACE_BACK_LEFT, &surface);
 
-	hsp_dev->hsp_winsys->flush_frontbuffer(hsp_dev->screen, surface, bitmap);
-
+	hsp_dev->hsp_winsys->flush_frontbuffer(hsp_dev->screen, surface, ctx->bitmap);
+	
 	return true;
 }
 
