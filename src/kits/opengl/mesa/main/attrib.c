@@ -1104,7 +1104,7 @@ _mesa_PopAttrib(void)
 		  _mesa_light(ctx, i, GL_DIFFUSE, l->Diffuse);
 		  _mesa_light(ctx, i, GL_SPECULAR, l->Specular );
 		  _mesa_light(ctx, i, GL_POSITION, l->EyePosition);
-		  _mesa_light(ctx, i, GL_SPOT_DIRECTION, l->EyeDirection);
+		  _mesa_light(ctx, i, GL_SPOT_DIRECTION, l->SpotDirection);
 		  _mesa_light(ctx, i, GL_SPOT_EXPONENT, &l->SpotExponent);
 		  _mesa_light(ctx, i, GL_SPOT_CUTOFF, &l->SpotCutoff);
 		  _mesa_light(ctx, i, GL_CONSTANT_ATTENUATION,
@@ -1265,7 +1265,7 @@ _mesa_PopAttrib(void)
 
                /* restore clip planes */
                for (i = 0; i < MAX_CLIP_PLANES; i++) {
-                  const GLuint mask = 1 << 1;
+                  const GLuint mask = 1 << i;
                   const GLfloat *eyePlane = xform->EyeUserPlane[i];
                   COPY_4V(ctx->Transform.EyeUserPlane[i], eyePlane);
                   if (xform->ClipPlanesEnabled & mask) {

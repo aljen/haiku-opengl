@@ -53,6 +53,7 @@
 #include "pipe/p_compiler.h"
 #include "pipe/p_state.h"
 #include "pipe/p_shader_tokens.h"
+#include "tgsi/tgsi_dump.h"
 #include "tgsi/tgsi_parse.h"
 #include "tgsi/tgsi_util.h"
 #include "tgsi_exec.h"
@@ -122,6 +123,103 @@
 /** The execution mask depends on the conditional mask and the loop mask */
 #define UPDATE_EXEC_MASK(MACH) \
       MACH->ExecMask = MACH->CondMask & MACH->LoopMask & MACH->ContMask & MACH->FuncMask
+
+
+static const union tgsi_exec_channel ZeroVec =
+   { { 0.0, 0.0, 0.0, 0.0 } };
+
+
+#ifdef DEBUG
+static void
+check_inf_or_nan(const union tgsi_exec_channel *chan)
+{
+   assert(!util_is_inf_or_nan(chan->f[0]));
+   assert(!util_is_inf_or_nan(chan->f[1]));
+   assert(!util_is_inf_or_nan(chan->f[2]));
+   assert(!util_is_inf_or_nan(chan->f[3]));
+}
+#endif
+
+
+#ifdef DEBUG
+static void
+print_chan(const char *msg, const union tgsi_exec_channel *chan)
+{
+   debug_printf("%s = {%f, %f, %f, %f}\n",
+                msg, chan->f[0], chan->f[1], chan->f[2], chan->f[3]);
+}
+#endif
+
+
+#ifdef DEBUG
+static void
+print_temp(const struct tgsi_exec_machine *mach, uint index)
+{
+   const struct tgsi_exec_vector *tmp = &mach->Temps[index];
+   int i;
+   debug_printf("Temp[%u] =\n", index);
+   for (i = 0; i < 4; i++) {
+      debug_printf("  %c: { %f, %f, %f, %f }\n",
+                   "XYZW"[i],
+                   tmp->xyzw[i].f[0],
+                   tmp->xyzw[i].f[1],
+                   tmp->xyzw[i].f[2],
+                   tmp->xyzw[i].f[3]);
+   }
+}
+#endif
+
+
+/**
+ * Check if there's a potential src/dst register data dependency when
+ * using SOA execution.
+ * Example:
+ *   MOV T, T.yxwz;
+ * This would expand into:
+ *   MOV t0, t1;
+ *   MOV t1, t0;
+ *   MOV t2, t3;
+ *   MOV t3, t2;
+ * The second instruction will have the wrong value for t0 if executed as-is.
+ */
+static boolean
+tgsi_check_soa_dependencies(const struct tgsi_full_instruction *inst)
+{
+   uint i, chan;
+
+   uint writemask = inst->FullDstRegisters[0].DstRegister.WriteMask;
+   if (writemask == TGSI_WRITEMASK_X ||
+       writemask == TGSI_WRITEMASK_Y ||
+       writemask == TGSI_WRITEMASK_Z ||
+       writemask == TGSI_WRITEMASK_W ||
+       writemask == TGSI_WRITEMASK_NONE) {
+      /* no chance of data dependency */
+      return FALSE;
+   }
+
+   /* loop over src regs */
+   for (i = 0; i < inst->Instruction.NumSrcRegs; i++) {
+      if ((inst->FullSrcRegisters[i].SrcRegister.File ==
+           inst->FullDstRegisters[0].DstRegister.File) &&
+          (inst->FullSrcRegisters[i].SrcRegister.Index ==
+           inst->FullDstRegisters[0].DstRegister.Index)) {
+         /* loop over dest channels */
+         uint channelsWritten = 0x0;
+         FOR_EACH_ENABLED_CHANNEL(*inst, chan) {
+            /* check if we're reading a channel that's been written */
+            uint swizzle = tgsi_util_get_full_src_register_extswizzle(&inst->FullSrcRegisters[i], chan);
+            if (swizzle <= TGSI_SWIZZLE_W &&
+                (channelsWritten & (1 << swizzle))) {
+               return TRUE;
+            }
+
+            channelsWritten |= (1 << chan);
+         }
+      }
+   }
+   return FALSE;
+}
+
 
 /**
  * Initialize machine state by expanding tokens to full instructions,
@@ -233,6 +331,17 @@ tgsi_exec_machine_bind_shader(
          memcpy(instructions + numInstructions,
                 &parse.FullToken.FullInstruction,
                 sizeof(instructions[0]));
+
+#if 0
+         if (tgsi_check_soa_dependencies(&parse.FullToken.FullInstruction)) {
+            debug_printf("SOA dependency in instruction:\n");
+            tgsi_dump_instruction(&parse.FullToken.FullInstruction,
+                                  numInstructions);
+         }
+#else
+         (void) tgsi_check_soa_dependencies;
+#endif
+
          numInstructions++;
          break;
 
@@ -278,6 +387,12 @@ tgsi_exec_machine_init(
       mach->Temps[TEMP_3_I].xyzw[TEMP_3_C].f[i] = 3.0f;
       mach->Temps[TEMP_HALF_I].xyzw[TEMP_HALF_C].f[i] = 0.5f;
    }
+
+#ifdef DEBUG
+   /* silence warnings */
+   (void) print_chan;
+   (void) print_temp;
+#endif
 }
 
 
@@ -1281,6 +1396,10 @@ store_dest(
    union tgsi_exec_channel *dst;
    uint execmask = mach->ExecMask;
 
+#ifdef DEBUG
+   check_inf_or_nan(chan);
+#endif
+
    switch (reg->DstRegister.File) {
    case TGSI_FILE_NULL:
       dst = &null;
@@ -1643,7 +1762,7 @@ exec_tex(struct tgsi_exec_machine *mach,
          lodBias = 0.0;
 
       fetch_texel(mach->Samplers[unit],
-                  &r[0], NULL, NULL, lodBias,  /* S, T, P, BIAS */
+                  &r[0], &ZeroVec, &ZeroVec, lodBias,  /* S, T, P, BIAS */
                   &r[0], &r[1], &r[2], &r[3]); /* R, G, B, A */
       break;
 
@@ -1847,7 +1966,7 @@ exec_instruction(
 
    switch (inst->Instruction.Opcode) {
    case TGSI_OPCODE_ARL:
-   /* TGSI_OPCODE_FLOOR */
+   case TGSI_OPCODE_FLOOR:
    /* TGSI_OPCODE_FLR */
       FOR_EACH_ENABLED_CHANNEL( *inst, chan_index ) {
          FETCH( &r[0], 0, chan_index );

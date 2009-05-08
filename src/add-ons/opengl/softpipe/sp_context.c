@@ -30,15 +30,6 @@
  *    Keith Whitwell <keith@tungstengraphics.com>
  */
 
-//#define ST_CONTEXT_PERF
-#ifdef ST_CONTEXT_PERF
-#	define TRACEP(x...)	fprintf(stderr, x);
-#else
-#	define TRACEP(x...)
-#endif
-
-#include <OS.h>
-#include <sys/time.h>
 #include "draw/draw_context.h"
 #include "pipe/p_defines.h"
 #include "util/u_math.h"
@@ -130,20 +121,28 @@ static void softpipe_destroy( struct pipe_context *pipe )
    FREE( softpipe );
 }
 
+static unsigned int
+softpipe_is_texture_referenced( struct pipe_context *pipe,
+				struct pipe_texture *texture,
+				unsigned face, unsigned level)
+{
+   return PIPE_UNREFERENCED;
+}
+
+static unsigned int
+softpipe_is_buffer_referenced( struct pipe_context *pipe,
+			       struct pipe_buffer *buf)
+{
+   return PIPE_UNREFERENCED;
+}
 
 struct pipe_context *
-softpipe_create( struct pipe_screen *screen,
-                 struct pipe_winsys *pipe_winsys,
-                 void *unused )
+softpipe_create( struct pipe_screen *screen )
 {
    struct softpipe_context *softpipe = CALLOC_STRUCT(softpipe_context);
    uint i;
-   bigtime_t beg, end;
 
-//   beg = time(NULL);
    util_init_math();
-//   end = time(NULL);
-//   TRACEP("%s> util_init_math time: %f\n", __FUNCTION__, difftime(end, beg));
 
 #ifdef PIPE_ARCH_X86
    softpipe->use_sse = !debug_get_bool_option( "GALLIUM_NOSSE", FALSE );
@@ -153,7 +152,7 @@ softpipe_create( struct pipe_screen *screen,
 
    softpipe->dump_fs = debug_get_bool_option( "GALLIUM_DUMP_FS", FALSE );
 
-   softpipe->pipe.winsys = pipe_winsys;
+   softpipe->pipe.winsys = screen->winsys;
    softpipe->pipe.screen = screen;
    softpipe->pipe.destroy = softpipe_destroy;
 
@@ -203,43 +202,25 @@ softpipe_create( struct pipe_screen *screen,
    softpipe->pipe.clear = softpipe_clear;
    softpipe->pipe.flush = softpipe_flush;
 
-//   beg = time(NULL);
-   softpipe_init_query_funcs( softpipe );
-//   end = time(NULL);
-//   TRACEP("%s> softpipe_init_query_funcs time: %f\n", __FUNCTION__,
-//	difftime(end, beg));
+   softpipe->pipe.is_texture_referenced = softpipe_is_texture_referenced;
+   softpipe->pipe.is_buffer_referenced = softpipe_is_buffer_referenced;
 
-//   beg = time(NULL);
+   softpipe_init_query_funcs( softpipe );
    softpipe_init_texture_funcs( softpipe );
-//   end = time(NULL);
-//   TRACEP("%s> softpipe_init_texture_funcs time: %f\n", __FUNCTION__,
-//	difftime(end, beg));
 
    /*
     * Alloc caches for accessing drawing surfaces and textures.
     * Must be before quad stage setup!
     */
-   beg = system_time();
    for (i = 0; i < PIPE_MAX_COLOR_BUFS; i++)
       softpipe->cbuf_cache[i] = sp_create_tile_cache( screen );
-   end = system_time();
-   TRACEP("%s> for(cbuf_cache) sp_create_tile_cache time: %Ld\n", __FUNCTION__, end - beg);
-
-//   beg = time(NULL);
    softpipe->zsbuf_cache = sp_create_tile_cache( screen );
-//   end = time(NULL);
-//   TRACEP("%s> sp_create_tile_cache time: %f\n", __FUNCTION__,
-//	difftime(end, beg));
 
-   beg = system_time();
    for (i = 0; i < PIPE_MAX_SAMPLERS; i++)
       softpipe->tex_cache[i] = sp_create_tile_cache( screen );
-   end = system_time();
-   TRACEP("%s> for(tex_cache) sp_create_tile_cache time: %Ld\n", __FUNCTION__, end - beg);
 
 
    /* setup quad rendering stages */
-//   beg = time(NULL);
    for (i = 0; i < SP_NUM_QUAD_THREADS; i++) {
       softpipe->quad[i].polygon_stipple = sp_quad_polygon_stipple_stage(softpipe);
       softpipe->quad[i].earlyz = sp_quad_earlyz_stage(softpipe);
@@ -253,12 +234,8 @@ softpipe_create( struct pipe_screen *screen,
       softpipe->quad[i].colormask = sp_quad_colormask_stage(softpipe);
       softpipe->quad[i].output = sp_quad_output_stage(softpipe);
    }
-//   end = time(NULL);
-//   TRACEP("%s> setup quad rendering stages time: %f\n", __FUNCTION__,
-//	difftime(end, beg));
 
    /* vertex shader samplers */
-//   beg = time(NULL);
    for (i = 0; i < PIPE_MAX_SAMPLERS; i++) {
       softpipe->tgsi.vert_samplers[i].base.get_samples = sp_get_samples_vertex;
       softpipe->tgsi.vert_samplers[i].unit = i;
@@ -266,12 +243,8 @@ softpipe_create( struct pipe_screen *screen,
       softpipe->tgsi.vert_samplers[i].cache = softpipe->tex_cache[i];
       softpipe->tgsi.vert_samplers_list[i] = &softpipe->tgsi.vert_samplers[i];
    }
-//   end = time(NULL);
-//   TRACEP("%s> vertex shader samplers time: %f\n", __FUNCTION__,
-//	difftime(end, beg));
 
    /* fragment shader samplers */
-//   beg = time(NULL);
    for (i = 0; i < PIPE_MAX_SAMPLERS; i++) {
       softpipe->tgsi.frag_samplers[i].base.get_samples = sp_get_samples_fragment;
       softpipe->tgsi.frag_samplers[i].unit = i;
@@ -279,35 +252,20 @@ softpipe_create( struct pipe_screen *screen,
       softpipe->tgsi.frag_samplers[i].cache = softpipe->tex_cache[i];
       softpipe->tgsi.frag_samplers_list[i] = &softpipe->tgsi.frag_samplers[i];
    }
-//   end = time(NULL);
-//   TRACEP("%s> fragment shader samplers time: %f\n", __FUNCTION__,
-//	difftime(end, beg));
 
    /*
     * Create drawing context and plug our rendering stage into it.
     */
-//   beg = time(NULL);
    softpipe->draw = draw_create();
-//   end = time(NULL);
-//   TRACEP("%s> draw_create time: %f\n", __FUNCTION__, difftime(end, beg));
    if (!softpipe->draw) 
       goto fail;
 
-//   beg = time(NULL);
    draw_texture_samplers(softpipe->draw,
                          PIPE_MAX_SAMPLERS,
                          (struct tgsi_sampler **)
                             softpipe->tgsi.vert_samplers_list);
-//   end = time(NULL);
-//   TRACEP("%s> draw_texture_samplers time: %f\n", __FUNCTION__,
-//	difftime(end, beg));
 
-//   beg = time(NULL);
    softpipe->setup = sp_draw_render_stage(softpipe);
-//   end = time(NULL);
-//   TRACEP("%s> sp_draw_render_stage time: %f\n", __FUNCTION__,
-//	difftime(end, beg));
-
    if (!softpipe->setup)
       goto fail;
 
@@ -324,27 +282,15 @@ softpipe_create( struct pipe_screen *screen,
    }
 
    /* plug in AA line/point stages */
-//   beg = time(NULL);
    draw_install_aaline_stage(softpipe->draw, &softpipe->pipe);
    draw_install_aapoint_stage(softpipe->draw, &softpipe->pipe);
-//   end = time(NULL);
-//   TRACEP("%s> AA line/point stages time: %f\n", __FUNCTION__,
-//	difftime(end, beg));
 
 #if USE_DRAW_STAGE_PSTIPPLE
    /* Do polygon stipple w/ texture map + frag prog? */
-//   beg = time(NULL);
    draw_install_pstipple_stage(softpipe->draw, &softpipe->pipe);
-//   end = time(NULL);
-//   TRACEP("%s> draw_install_pstipple_stage time: %f\n", __FUNCTION__,
-//	difftime(end, beg));
 #endif
 
-//   beg = time(NULL);
    sp_init_surface_functions(softpipe);
-//   end = time(NULL);
-//   TRACEP("%s> sp_init_surface_functions time: %f\n", __FUNCTION__,
-//	difftime(end, beg));
 
    return &softpipe->pipe;
 

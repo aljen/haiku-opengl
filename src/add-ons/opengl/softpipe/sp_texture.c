@@ -138,7 +138,6 @@ softpipe_texture_create(struct pipe_screen *screen,
          goto fail;
    }
     
-   assert(p_atomic_read(&spt->base.reference.count) == 1);
    return &spt->base;
 
  fail:
@@ -328,7 +327,7 @@ static void *
 softpipe_transfer_map( struct pipe_screen *screen,
                        struct pipe_transfer *transfer )
 {
-   ubyte *map;
+   ubyte *map, *xfer_map;
    struct softpipe_texture *spt;
    unsigned flags = 0;
 
@@ -358,9 +357,11 @@ softpipe_transfer_map( struct pipe_screen *screen,
       softpipe_screen(screen)->timestamp++;
    }
    
-   return map + softpipe_transfer(transfer)->offset +
+   xfer_map = map + softpipe_transfer(transfer)->offset +
       transfer->y / transfer->block.height * transfer->stride +
       transfer->x / transfer->block.width * transfer->block.size;
+   /*printf("map = %p  xfer map = %p\n", map, xfer_map);*/
+   return xfer_map;
 }
 
 
@@ -397,4 +398,23 @@ softpipe_init_screen_texture_funcs(struct pipe_screen *screen)
    screen->tex_transfer_destroy = softpipe_tex_transfer_destroy;
    screen->transfer_map = softpipe_transfer_map;
    screen->transfer_unmap = softpipe_transfer_unmap;
+}
+
+
+boolean
+softpipe_get_texture_buffer( struct pipe_texture *texture,
+                             struct pipe_buffer **buf,
+                             unsigned *stride )
+{
+   struct softpipe_texture *tex = (struct softpipe_texture *)texture;
+
+   if (!tex)
+      return FALSE;
+
+   pipe_buffer_reference(buf, tex->buffer);
+
+   if (stride)
+      *stride = tex->stride[0];
+
+   return TRUE;
 }

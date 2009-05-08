@@ -42,7 +42,6 @@ struct pipe_state_cache;
 struct pipe_query;
 struct pipe_winsys;
 
-
 /**
  * Gallium rendering context.  Basically:
  *  - state setting functions
@@ -192,30 +191,73 @@ struct pipe_context {
     * Surface functions
     */
    /*@{*/
+
+   /**
+    * Copy a block of pixels from one surface to another.
+    * The surfaces must be of the same format.
+    */
    void (*surface_copy)(struct pipe_context *pipe,
 			struct pipe_surface *dest,
 			unsigned destx, unsigned desty,
-			struct pipe_surface *src, /* don't make this const - 
-						     need to map/unmap */
+			struct pipe_surface *src,
 			unsigned srcx, unsigned srcy,
 			unsigned width, unsigned height);
 
+   /**
+    * Fill a region of a surface with a constant value.
+    */
    void (*surface_fill)(struct pipe_context *pipe,
 			struct pipe_surface *dst,
 			unsigned dstx, unsigned dsty,
 			unsigned width, unsigned height,
 			unsigned value);
-
-   void (*clear)(struct pipe_context *pipe, 
-		 struct pipe_surface *ps,
-		 unsigned clearValue);
    /*@}*/
 
+   /**
+    * Clear the specified set of currently bound buffers to specified values.
+    *
+    * buffers is a bitfield of PIPE_CLEAR_* values.
+    *
+    * rgba is a pointer to an array of one float for each of r, g, b, a.
+    */
+   void (*clear)(struct pipe_context *pipe,
+                 unsigned buffers,
+		 const float *rgba,
+                 double depth,
+		 unsigned stencil);
 
    /** Flush rendering (flags = bitmask of PIPE_FLUSH_x tokens) */
    void (*flush)( struct pipe_context *pipe,
                   unsigned flags,
                   struct pipe_fence_handle **fence );
+
+   /**
+    * Check whether a texture is referenced by an unflushed hw command.
+    * The state-tracker uses this function to optimize away unnecessary
+    * flushes. It is safe (but wasteful) to always return.
+    * PIPE_REFERENCED_FOR_READ | PIPE_REFERENCED_FOR_WRITE.
+    * \param pipe  The pipe context whose unflushed hw commands will be
+    *              checked.
+    * \param level  mipmap level.
+    * \param texture  texture to check.
+    * \param face  cubemap face. Use 0 for non-cubemap texture.
+    */
+
+   unsigned int (*is_texture_referenced) (struct pipe_context *pipe,
+					  struct pipe_texture *texture,
+					  unsigned face, unsigned level);
+   /**
+    * Check whether a buffer is referenced by an unflushed hw command.
+    * The state-tracker uses this function to optimize away unnecessary
+    * flushes. It is safe (but wasteful) to always return
+    * PIPE_REFERENCED_FOR_READ | PIPE_REFERENCED_FOR_WRITE.
+    * \param pipe  The pipe context whose unflushed hw commands will be
+    *              checked.
+    * \param buf  Buffer to check.
+    */
+
+   unsigned int (*is_buffer_referenced) (struct pipe_context *pipe,
+					 struct pipe_buffer *buf);
 };
 
 

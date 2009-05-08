@@ -979,35 +979,62 @@ _mesa_vsprintf( char *str, const char *fmt, va_list args )
 /** \name Diagnostics */
 /*@{*/
 
+static void
+output_if_debug(const char *prefixString, const char *outputString,
+                GLboolean newline)
+{
+   static int debug = -1;
+
+   /* Check the MESA_DEBUG environment variable if it hasn't
+    * been checked yet.  We only have to check it once...
+    */
+   if (debug == -1) {
+      char *env = _mesa_getenv("MESA_DEBUG");
+
+      /* In a debug build, we print warning messages *unless*
+       * MESA_DEBUG is 0.  In a non-debug build, we don't
+       * print warning messages *unless* MESA_DEBUG is
+       * set *to any value*.
+       */
+#ifdef DEBUG
+      debug = (env != NULL && _mesa_atoi(env) == 0) ? 0 : 1;
+#else
+      debug = (env != NULL) ? 1 : 0;
+#endif
+   }
+
+   /* Now only print the string if we're required to do so. */
+   if (debug) {
+      fprintf(stderr, "%s: %s", prefixString, outputString);
+      if (newline)
+         fprintf(stderr, "\n");
+   }
+}
+
+
 /**
  * Report a warning (a recoverable error condition) to stderr if
  * either DEBUG is defined or the MESA_DEBUG env var is set.
  *
  * \param ctx GL context.
- * \param fmtString printf() alike format string.
+ * \param fmtString printf()-like format string.
  */
 void
 _mesa_warning( GLcontext *ctx, const char *fmtString, ... )
 {
-   GLboolean debug;
    char str[MAXSTRING];
    va_list args;
    (void) ctx;
    va_start( args, fmtString );  
    (void) vsnprintf( str, MAXSTRING, fmtString, args );
    va_end( args );
-#ifdef DEBUG
-   debug = GL_TRUE; /* always print warning */
-#else
-   debug = _mesa_getenv("MESA_DEBUG") ? GL_TRUE : GL_FALSE;
-#endif
-   if (debug) {
-      fprintf(stderr, "Mesa warning: %s\n", str);
-   }
+
+   output_if_debug("Mesa warning", str, GL_TRUE);
 }
 
+
 /**
- * Report an internla implementation problem.
+ * Report an internal implementation problem.
  * Prints the message to stderr via fprintf().
  *
  * \param ctx GL context.
@@ -1028,8 +1055,9 @@ _mesa_problem( const GLcontext *ctx, const char *fmtString, ... )
    fprintf(stderr, "Please report at bugzilla.freedesktop.org\n");
 }
 
+
 /**
- * Record an OpenGL state error.  These usually occur when the users
+ * Record an OpenGL state error.  These usually occur when the user
  * passes invalid parameters to a GL function.
  *
  * If debugging is enabled (either at compile-time via the DEBUG macro, or
@@ -1101,11 +1129,22 @@ _mesa_error( GLcontext *ctx, GLenum error, const char *fmtString, ... )
 	    errstr = "unknown";
 	    break;
       }
-      _mesa_debug(ctx, "User error: %s in %s\n", errstr, where);
+
+      {
+         char s[MAXSTRING], s2[MAXSTRING];
+         va_list args;
+         va_start(args, fmtString);
+         vsnprintf(s, MAXSTRING, fmtString, args);
+         va_end(args);
+
+         _mesa_snprintf(s2, MAXSTRING, "%s in %s", errstr, s);
+         output_if_debug("Mesa: User error", s2, GL_TRUE);
+      }
    }
 
    _mesa_record_error(ctx, error);
-}  
+}
+
 
 /**
  * Report debug information.  Print error message to stderr via fprintf().
@@ -1123,7 +1162,7 @@ _mesa_debug( const GLcontext *ctx, const char *fmtString, ... )
    va_start(args, fmtString);
    vsnprintf(s, MAXSTRING, fmtString, args);
    va_end(args);
-   fprintf(stderr, "Mesa: %s", s);
+   output_if_debug("Mesa", s, GL_FALSE);
 #endif /* DEBUG */
    (void) ctx;
    (void) fmtString;

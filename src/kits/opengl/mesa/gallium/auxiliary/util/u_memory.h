@@ -51,9 +51,6 @@ extern "C" {
 #endif
 #endif
 
-#if defined(__HAIKU__)
-extern void *perf_calloc(size_t numElements, size_t size);
-#endif
 
 #if defined(PIPE_OS_WINDOWS) && defined(DEBUG) 
 
@@ -99,12 +96,9 @@ ExFreePool(void *P);
 #define _FREE(_ptr) ExFreePool(_ptr)
 
 #else
+
 #define MALLOC( SIZE )  malloc( SIZE )
-//#if defined(__HAIKU__)
-//#	define CALLOC( COUNT, SIZE ) perf_calloc( COUNT, SIZE )
-//#else
-#	define CALLOC( COUNT, SIZE ) calloc( COUNT, SIZE )
-//#endif
+#define CALLOC( COUNT, SIZE )   calloc( COUNT, SIZE )
 #define FREE( PTR )  free( PTR )
 #define REALLOC( OLDPTR, OLDSIZE, NEWSIZE )  realloc( OLDPTR, NEWSIZE )
 

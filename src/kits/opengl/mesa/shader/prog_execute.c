@@ -212,19 +212,14 @@ fetch_vector4(const struct prog_src_register *source,
       result[3] = src[GET_SWZ(source->Swizzle, 3)];
    }
 
-   if (source->NegateBase) {
-      result[0] = -result[0];
-      result[1] = -result[1];
-      result[2] = -result[2];
-      result[3] = -result[3];
-   }
    if (source->Abs) {
       result[0] = FABSF(result[0]);
       result[1] = FABSF(result[1]);
       result[2] = FABSF(result[2]);
       result[3] = FABSF(result[3]);
    }
-   if (source->NegateAbs) {
+   if (source->Negate) {
+      ASSERT(source->Negate == NEGATE_XYZW);
       result[0] = -result[0];
       result[1] = -result[1];
       result[2] = -result[2];
@@ -259,7 +254,7 @@ fetch_vector4ui(const struct prog_src_register *source,
       result[3] = src[GET_SWZ(source->Swizzle, 3)];
    }
 
-   /* Note: no NegateBase, Abs, NegateAbs here */
+   /* Note: no Negate or Abs here */
 }
 
 
@@ -299,19 +294,14 @@ fetch_vector4_deriv(GLcontext * ctx,
       result[2] = deriv[GET_SWZ(source->Swizzle, 2)];
       result[3] = deriv[GET_SWZ(source->Swizzle, 3)];
       
-      if (source->NegateBase) {
-         result[0] = -result[0];
-         result[1] = -result[1];
-         result[2] = -result[2];
-         result[3] = -result[3];
-      }
       if (source->Abs) {
          result[0] = FABSF(result[0]);
          result[1] = FABSF(result[1]);
          result[2] = FABSF(result[2]);
          result[3] = FABSF(result[3]);
       }
-      if (source->NegateAbs) {
+      if (source->Negate) {
+         ASSERT(source->Negate == NEGATE_XYZW);
          result[0] = -result[0];
          result[1] = -result[1];
          result[2] = -result[2];
@@ -336,13 +326,10 @@ fetch_vector1(const struct prog_src_register *source,
 
    result[0] = src[GET_SWZ(source->Swizzle, 0)];
 
-   if (source->NegateBase) {
-      result[0] = -result[0];
-   }
    if (source->Abs) {
       result[0] = FABSF(result[0]);
    }
-   if (source->NegateAbs) {
+   if (source->Negate) {
       result[0] = -result[0];
    }
 }
@@ -836,7 +823,7 @@ _mesa_execute_program(GLcontext * ctx,
                 * result.z = result.x * APPX(result.y)
                 * We do what the ARB extension says.
                 */
-               q[2] = (GLfloat) pow(2.0, t[0]);
+               q[2] = (GLfloat) _mesa_pow(2.0, t[0]);
             }
             q[1] = t[0] - floor_t0;
             q[3] = 1.0F;
@@ -949,7 +936,7 @@ _mesa_execute_program(GLcontext * ctx,
                if (a[1] == 0.0 && a[3] == 0.0)
                   result[2] = 1.0;
                else
-                  result[2] = EXPF(a[3] * LOGF(a[1]));
+                  result[2] = (GLfloat) _mesa_pow(a[1], a[3]);
             }
             else {
                result[2] = 0.0;
@@ -1514,7 +1501,7 @@ _mesa_execute_program(GLcontext * ctx,
                   ASSERT(swz <= 3);
                   result[i] = src[swz];
                }
-               if (source->NegateBase & (1 << i))
+               if (source->Negate & (1 << i))
                   result[i] = -result[i];
             }
             store_vector4(inst, machine, result);
@@ -1540,8 +1527,8 @@ _mesa_execute_program(GLcontext * ctx,
       case OPCODE_TXB:         /* GL_ARB_fragment_program only */
          /* Texel lookup with LOD bias */
          {
-            const struct gl_texture_unit *texUnit
-               = &ctx->Texture.Unit[inst->TexSrcUnit];
+            const GLuint unit = machine->Samplers[inst->TexSrcUnit];
+            const struct gl_texture_unit *texUnit = &ctx->Texture.Unit[unit];
             GLfloat texcoord[4], color[4], lodBias;
 
             fetch_vector4(&inst->SrcReg[0], machine, texcoord);

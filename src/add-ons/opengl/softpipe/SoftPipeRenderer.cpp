@@ -53,8 +53,8 @@ SoftPipeRenderer::SoftPipeRenderer(BGLView *view, ulong options,
 	fDirectModeEnabled(false),
 	fInfo(NULL),
 	fInfoLocker("info locker"),
-	fColorSpace(B_NO_COLOR_SPACE),
-	fOptions(options)
+	fOptions(options),
+	fColorSpace(B_NO_COLOR_SPACE)
 {
 	CALLED();
 	time_t beg, end;
@@ -75,7 +75,7 @@ SoftPipeRenderer::SoftPipeRenderer(BGLView *view, ulong options,
 	fHeight = height;
 	beg = time(NULL);
 	fContext = hsp_create_layer_context(fBitmap, 0);
-	TRACE("context:\t%d\n", fContext);
+	TRACE("context:\t%d\n", (int)fContext);
 	end = time(NULL);
 	TRACE("hsp_create_layer_context time: %f.\n", difftime(end, beg));
 	if (!hsp_get_current_context())
@@ -174,10 +174,10 @@ SoftPipeRenderer::CopyPixelsOut(BPoint location, BBitmap *bitmap)
 	BRect sr = fBitmap->Bounds();
 	BRect dr = bitmap->Bounds();
 
-	int32 w1 = sr.IntegerWidth();
-	int32 h1 = sr.IntegerHeight();
-	int32 w2 = dr.IntegerWidth();
-	int32 h2 = dr.IntegerHeight();
+//	int32 w1 = sr.IntegerWidth();
+//	int32 h1 = sr.IntegerHeight();
+//	int32 w2 = dr.IntegerWidth();
+//	int32 h2 = dr.IntegerHeight();
 
 	sr = sr & dr.OffsetBySelf(location);
 	dr = sr.OffsetByCopy(-location.x, -location.y);
@@ -279,6 +279,7 @@ const GLubyte *
 SoftPipeRenderer::GetString(GLcontext *ctx, GLenum name)
 {
 	CALLED();
+	return NULL;
 }
 
 

@@ -169,6 +169,14 @@ st_translate_vertex_program(struct st_context *st,
          case VERT_ATTRIB_GENERIC5:
          case VERT_ATTRIB_GENERIC6:
          case VERT_ATTRIB_GENERIC7:
+         case VERT_ATTRIB_GENERIC8:
+         case VERT_ATTRIB_GENERIC9:
+         case VERT_ATTRIB_GENERIC10:
+         case VERT_ATTRIB_GENERIC11:
+         case VERT_ATTRIB_GENERIC12:
+         case VERT_ATTRIB_GENERIC13:
+         case VERT_ATTRIB_GENERIC14:
+         case VERT_ATTRIB_GENERIC15:
             assert(attr < VERT_ATTRIB_MAX);
             vs_input_semantic_name[slot] = TGSI_SEMANTIC_GENERIC;
             vs_input_semantic_index[slot] = num_generic++;
@@ -427,11 +435,13 @@ st_translate_fragment_program(struct st_context *st,
             interpMode[slot] = TGSI_INTERPOLATE_LINEAR;
             break;
          case FRAG_ATTRIB_FOGC:
-            if (stfp->Base.UsesPointCoord)
+            if (stfp->Base.UsesPointCoord) {
                stfp->input_semantic_name[slot] = TGSI_SEMANTIC_GENERIC;
-            else
+               stfp->input_semantic_index[slot] = num_generic++;
+            } else {
                stfp->input_semantic_name[slot] = TGSI_SEMANTIC_FOG;
-            stfp->input_semantic_index[slot] = 0;
+               stfp->input_semantic_index[slot] = 0;
+	    }
             interpMode[slot] = TGSI_INTERPOLATE_PERSPECTIVE;
             break;
          case FRAG_ATTRIB_TEX0:
@@ -482,14 +492,14 @@ st_translate_fragment_program(struct st_context *st,
                /* handled above */
                assert(0);
                break;
-            case FRAG_RESULT_COLOR:
+            default:
+               assert(attr == FRAG_RESULT_COLOR ||
+                      (FRAG_RESULT_DATA0 <= attr && attr < FRAG_RESULT_MAX));
                fs_output_semantic_name[fs_num_outputs] = TGSI_SEMANTIC_COLOR;
                fs_output_semantic_index[fs_num_outputs] = numColors;
                outputMapping[attr] = fs_num_outputs;
                numColors++;
                break;
-            default:
-               assert(0);
             }
 
             output_flags[fs_num_outputs] = stfp->Base.Base.OutputFlags[attr];

@@ -281,8 +281,6 @@ struct pipe_surface
 {
    struct pipe_reference reference;
    enum pipe_format format;      /**< PIPE_FORMAT_x */
-   unsigned status;              /**< PIPE_SURFACE_STATUS_x */
-   unsigned clear_value;         /**< XXX may be temporary */
    unsigned width;               /**< logical width in pixels */
    unsigned height;              /**< logical height in pixels */
    unsigned layout;              /**< PIPE_SURFACE_LAYOUT_x */
@@ -338,7 +336,6 @@ struct pipe_texture
    unsigned nblocksy[PIPE_MAX_TEXTURE_LEVELS]; /**< allocated height in blocks */
 
    unsigned last_level:8;    /**< Index of last mipmap level present/defined */
-   unsigned compressed:1;
 
    unsigned nr_samples:8;    /**< for multisampled surfaces, nr of samples */
 

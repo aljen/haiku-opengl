@@ -389,7 +389,6 @@ _mesa_buffer_map( GLcontext *ctx, GLenum target, GLenum access,
    (void) ctx;
    (void) target;
    (void) access;
-   ASSERT(!bufObj->OnCard);
    /* Just return a direct pointer to the data */
    if (bufObj->Pointer) {
       /* already mapped! */
@@ -413,7 +412,6 @@ _mesa_buffer_unmap( GLcontext *ctx, GLenum target,
 {
    (void) ctx;
    (void) target;
-   ASSERT(!bufObj->OnCard);
    /* XXX we might assert here that bufObj->Pointer is non-null */
    bufObj->Pointer = NULL;
    return GL_TRUE;
@@ -958,7 +956,11 @@ _mesa_BufferDataARB(GLenum target, GLsizeiptrARB size,
       bufObj->Pointer = NULL;
    }  
 
+   FLUSH_VERTICES(ctx, _NEW_BUFFER_OBJECT);
+
    ASSERT(ctx->Driver.BufferData);
+
+   bufObj->Written = GL_TRUE;
 
    /* Give the buffer object to the driver!  <data> may be null! */
    ctx->Driver.BufferData( ctx, target, size, data, usage, bufObj );
@@ -979,6 +981,8 @@ _mesa_BufferSubDataARB(GLenum target, GLintptrARB offset,
       /* error already recorded */
       return;
    }
+
+   bufObj->Written = GL_TRUE;
 
    ASSERT(ctx->Driver.BufferSubData);
    ctx->Driver.BufferSubData( ctx, target, offset, size, data, bufObj );
@@ -1044,6 +1048,8 @@ _mesa_MapBufferARB(GLenum target, GLenum access)
    }
 
    bufObj->Access = access;
+   if (access == GL_WRITE_ONLY_ARB || access == GL_READ_WRITE_ARB)
+      bufObj->Written = GL_TRUE;
 
    return bufObj->Pointer;
 }

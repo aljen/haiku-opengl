@@ -36,7 +36,7 @@
 
 #include "pipe/p_config.h"
 
-#if defined(PIPE_OS_LINUX) || defined(PIPE_OS_BSD) || defined(PIPE_OS_HAIKU)
+#if defined(PIPE_OS_LINUX) || defined(PIPE_OS_BSD) || defined(PIPE_OS_SOLARIS)
 #include <unistd.h>
 #include <sched.h>
 #endif
@@ -115,7 +115,7 @@ _fenced_buffer_add(struct fenced_buffer *fenced_buf)
 {
    struct fenced_buffer_list *fenced_list = fenced_buf->list;
 
-   assert(p_atomic_read(&fenced_buf->base.base.reference.count));
+   assert(pipe_is_referenced(&fenced_buf->base.base.reference));
    assert(fenced_buf->flags & PIPE_BUFFER_USAGE_GPU_READ_WRITE);
    assert(fenced_buf->fence);
 
@@ -137,7 +137,7 @@ _fenced_buffer_destroy(struct fenced_buffer *fenced_buf)
 {
    struct fenced_buffer_list *fenced_list = fenced_buf->list;
    
-   assert(p_atomic_read(&fenced_buf->base.base.reference.count) == 0);
+   assert(!pipe_is_referenced(&fenced_buf->base.base.reference));
    assert(!fenced_buf->fence);
 #ifdef DEBUG
    assert(fenced_buf->head.prev);
@@ -181,7 +181,7 @@ _fenced_buffer_remove(struct fenced_buffer_list *fenced_list,
     * FIXME!!!
     */
 
-   if(!p_atomic_read(&fenced_buf->base.base.reference.count))
+   if(!pipe_is_referenced(&fenced_buf->base.base.reference))
       _fenced_buffer_destroy(fenced_buf);
 }
 
@@ -257,7 +257,7 @@ fenced_buffer_destroy(struct pb_buffer *buf)
    struct fenced_buffer_list *fenced_list = fenced_buf->list;
 
    pipe_mutex_lock(fenced_list->mutex);
-   assert(p_atomic_read(&fenced_buf->base.base.reference.count) == 0);
+   assert(!pipe_is_referenced(&fenced_buf->base.base.reference));
    if (fenced_buf->fence) {
       struct pb_fence_ops *ops = fenced_list->ops;
       if(ops->fence_signalled(ops, fenced_buf->fence, 0) == 0) {
@@ -365,21 +365,22 @@ fenced_buffer_validate(struct pb_buffer *buf,
    if(fenced_buf->vl && fenced_buf->vl != vl)
       return PIPE_ERROR_RETRY;
    
+#if 0
    /* Do not validate if buffer is still mapped */
    if(fenced_buf->flags & PIPE_BUFFER_USAGE_CPU_READ_WRITE) {
       /* TODO: wait for the thread that mapped the buffer to unmap it */
       return PIPE_ERROR_RETRY;
    }
+   /* Final sanity checking */
+   assert(!(fenced_buf->flags & PIPE_BUFFER_USAGE_CPU_READ_WRITE));
+   assert(!fenced_buf->mapcount);
+#endif
 
    if(fenced_buf->vl == vl &&
       (fenced_buf->validation_flags & flags) == flags) {
       /* Nothing to do -- buffer already validated */
       return PIPE_OK;
    }
-
-   /* Final sanity checking */
-   assert(!(fenced_buf->flags & PIPE_BUFFER_USAGE_CPU_READ_WRITE));
-   assert(!fenced_buf->mapcount);
    
    ret = pb_validate(fenced_buf->buffer, vl, flags);
    if (ret != PIPE_OK)
@@ -530,16 +531,17 @@ fenced_buffer_list_dump(struct fenced_buffer_list *fenced_list)
 
    pipe_mutex_lock(fenced_list->mutex);
 
-   debug_printf("%10s %7s %10s %s\n",
-                "buffer", "reference.count", "fence", "signalled");
+   debug_printf("%10s %7s %7s %10s %s\n",
+                "buffer", "size", "refcount", "fence", "signalled");
    
    curr = fenced_list->unfenced.next;
    next = curr->next;
    while(curr != &fenced_list->unfenced) {
       fenced_buf = LIST_ENTRY(struct fenced_buffer, curr, head);
       assert(!fenced_buf->fence);
-      debug_printf("%10p %7u\n",
+      debug_printf("%10p %7u %7u\n",
                    fenced_buf,
+                   fenced_buf->base.base.size,
                    fenced_buf->base.base.reference.count);
       curr = next; 
       next = curr->next;
@@ -551,8 +553,9 @@ fenced_buffer_list_dump(struct fenced_buffer_list *fenced_list)
       int signaled;
       fenced_buf = LIST_ENTRY(struct fenced_buffer, curr, head);
       signaled = ops->fence_signalled(ops, fenced_buf->fence, 0);
-      debug_printf("%10p %7u %10p %s\n",
+      debug_printf("%10p %7u %7u %10p %s\n",
                    fenced_buf,
+                   fenced_buf->base.base.size,
                    fenced_buf->base.base.reference.count,
                    fenced_buf->fence,
                    signaled == 0 ? "y" : "n");
@@ -573,7 +576,7 @@ fenced_buffer_list_destroy(struct fenced_buffer_list *fenced_list)
    /* Wait on outstanding fences */
    while (fenced_list->numDelayed) {
       pipe_mutex_unlock(fenced_list->mutex);
-#if defined(PIPE_OS_LINUX) || defined(PIPE_OS_BSD) || defined(PIPE_OS_HAIKU)
+#if defined(PIPE_OS_LINUX) || defined(PIPE_OS_BSD) || defined(PIPE_OS_SOLARIS)
       sched_yield();
 #endif
       _fenced_buffer_list_check_free(fenced_list, 1);

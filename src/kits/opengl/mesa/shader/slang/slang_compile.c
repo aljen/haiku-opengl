@@ -2161,6 +2161,12 @@ parse_function(slang_parse_ctx * C, slang_output_ctx * O, int definition,
                                            (O->funs->num_functions + 1)
                                            * sizeof(slang_function));
       if (O->funs->functions == NULL) {
+         /* Make sure that there are no functions marked, as the
+          * allocation is currently NULL, in order to avoid
+          * a potental segfault as we clean up later.
+          */
+         O->funs->num_functions = 0;
+
          slang_info_log_memory(C->L);
          slang_function_destruct(&parsed_func);
          return GL_FALSE;
@@ -2435,6 +2441,8 @@ parse_code_unit(slang_parse_ctx * C, slang_code_unit * unit,
       _slang_codegen_function(&A, mainFunc);
 
       shader->Main = GL_TRUE; /* this shader defines main() */
+
+      shader->UnresolvedRefs = A.UnresolvedRefs;
    }
 
    _slang_pop_var_table(o.vartable);
@@ -2799,7 +2807,8 @@ _slang_compile(GLcontext *ctx, struct gl_shader *shader)
    shader->CompileStatus = success;
 
    if (success) {
-      if (shader->Pragmas.Optimize) {
+      if (shader->Pragmas.Optimize &&
+          (ctx->Shader.Flags & GLSL_NO_OPT) == 0) {
          _mesa_optimize_program(ctx, shader->Program);
       }
    }

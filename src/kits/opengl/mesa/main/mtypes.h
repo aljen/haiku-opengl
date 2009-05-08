@@ -460,7 +460,7 @@ struct gl_light
    GLfloat Diffuse[4];		/**< diffuse color */
    GLfloat Specular[4];		/**< specular color */
    GLfloat EyePosition[4];	/**< position in eye coordinates */
-   GLfloat EyeDirection[4];	/**< spotlight dir in eye coordinates */
+   GLfloat SpotDirection[4];	/**< spotlight direction in eye coordinates */
    GLfloat SpotExponent;
    GLfloat SpotCutoff;		/**< in degrees */
    GLfloat _CosCutoffNeg;	/**< = cos(SpotCutoff) */
@@ -479,7 +479,7 @@ struct gl_light
    GLfloat _Position[4];	/**< position in eye/obj coordinates */
    GLfloat _VP_inf_norm[3];	/**< Norm direction to infinite light */
    GLfloat _h_inf_norm[3];	/**< Norm( _VP_inf_norm + <0,0,1> ) */
-   GLfloat _NormDirection[4];	/**< normalized spotlight direction */
+   GLfloat _NormSpotDirection[4]; /**< normalized spotlight direction */
    GLfloat _VP_inf_spot_attenuation;
 
    GLfloat _SpotExpTable[EXP_TABLE_SIZE][2];  /**< to replace a pow() call */
@@ -1028,7 +1028,7 @@ struct gl_stencil_attrib
 
 /**
  * An index for each type of texture object.  These correspond to the GL
- * target target enums, such as GL_TEXTURE_2D, GL_TEXTURE_CUBE_MAP, etc.
+ * texture target enums, such as GL_TEXTURE_2D, GL_TEXTURE_CUBE_MAP, etc.
  * Note: the order is from highest priority to lowest priority.
  */
 typedef enum
@@ -1296,7 +1296,6 @@ struct gl_texture_object
    GLenum Target;               /**< GL_TEXTURE_1D, GL_TEXTURE_2D, etc. */
    GLfloat Priority;		/**< in [0,1] */
    GLfloat BorderColor[4];	/**< unclamped */
-   GLchan _BorderChan[4];	/**< clamped, as GLchan */
    GLenum WrapS;		/**< S-axis texture image wrap mode */
    GLenum WrapT;		/**< T-axis texture image wrap mode */
    GLenum WrapR;		/**< R-axis texture image wrap mode */
@@ -1338,18 +1337,23 @@ struct gl_texture_object
 };
 
 
+/** Up to four combiner sources are possible with GL_NV_texture_env_combine4 */
+#define MAX_COMBINER_TERMS 4
+
+
 /**
  * Texture combine environment state.
- * Up to four combiner sources are possible with GL_NV_texture_env_combine4.
  */
 struct gl_tex_env_combine_state
 {
    GLenum ModeRGB;       /**< GL_REPLACE, GL_DECAL, GL_ADD, etc. */
    GLenum ModeA;         /**< GL_REPLACE, GL_DECAL, GL_ADD, etc. */
-   GLenum SourceRGB[4];  /**< GL_PRIMARY_COLOR, GL_TEXTURE, etc. */
-   GLenum SourceA[4];    /**< GL_PRIMARY_COLOR, GL_TEXTURE, etc. */
-   GLenum OperandRGB[4]; /**< SRC_COLOR, ONE_MINUS_SRC_COLOR, etc */
-   GLenum OperandA[4];   /**< SRC_ALPHA, ONE_MINUS_SRC_ALPHA, etc */
+   /** Source terms: GL_PRIMARY_COLOR, GL_TEXTURE, etc */
+   GLenum SourceRGB[MAX_COMBINER_TERMS];
+   GLenum SourceA[MAX_COMBINER_TERMS];
+   /** Source operands: GL_SRC_COLOR, GL_ONE_MINUS_SRC_COLOR, etc */
+   GLenum OperandRGB[MAX_COMBINER_TERMS];
+   GLenum OperandA[MAX_COMBINER_TERMS];
    GLuint ScaleShiftRGB; /**< 0, 1 or 2 */
    GLuint ScaleShiftA;   /**< 0, 1 or 2 */
    GLuint _NumArgsRGB;   /**< Number of inputs used for the RGB combiner */
@@ -1501,7 +1505,7 @@ struct gl_buffer_object
    GLsizeiptr Length;        /**< mapped length */
    GLsizeiptrARB Size;       /**< Size of storage in bytes */
    GLubyte *Data;            /**< Location of storage either in RAM or VRAM. */
-   GLboolean OnCard;         /**< Is buffer in VRAM? (hardware drivers) */
+   GLboolean Written;        /**< Ever written to? (for debugging) */
 };
 
 
@@ -1537,10 +1541,10 @@ struct gl_client_array
    const GLubyte *Ptr;          /**< Points to array data */
    GLboolean Enabled;		/**< Enabled flag is a boolean */
    GLboolean Normalized;        /**< GL_ARB_vertex_program */
+   GLuint _ElementSize;         /**< size of each element in bytes */
 
-   /**< GL_ARB_vertex_buffer_object */
-   struct gl_buffer_object *BufferObj;
-   GLuint _MaxElement;
+   struct gl_buffer_object *BufferObj;/**< GL_ARB_vertex_buffer_object */
+   GLuint _MaxElement;          /**< max element index into array buffer */
 };
 
 
@@ -1974,6 +1978,7 @@ struct gl_shader
    GLboolean DeletePending;
    GLboolean CompileStatus;
    GLboolean Main;  /**< shader defines main() */
+   GLboolean UnresolvedRefs;
    const GLchar *Source;  /**< Source code string */
    struct gl_program *Program;  /**< Post-compile assembly code */
    GLchar *InfoLog;
@@ -2044,6 +2049,9 @@ struct gl_shared_state
 
    /** Default texture objects (shared by all texture units) */
    struct gl_texture_object *DefaultTex[NUM_TEXTURE_TARGETS];
+
+   /** Fallback texture used when a bound texture is incomplete */
+   struct gl_texture_object *FallbackTex;
 
    /**
     * \name Thread safety and statechange notification for texture
@@ -2503,6 +2511,7 @@ struct gl_extensions
    GLboolean MESA_resize_buffers;
    GLboolean MESA_ycbcr_texture;
    GLboolean MESA_texture_array;
+   GLboolean MESA_texture_signed_rgba;
    GLboolean NV_blend_square;
    GLboolean NV_fragment_program;
    GLboolean NV_light_max_exponent;
@@ -2609,6 +2618,8 @@ struct gl_matrix_stack
 #define _NEW_TRACK_MATRIX       0x4000000  /**< __GLcontextRec::VertexProgram */
 #define _NEW_PROGRAM            0x8000000  /**< __GLcontextRec::VertexProgram */
 #define _NEW_CURRENT_ATTRIB     0x10000000  /**< __GLcontextRec::Current */
+#define _NEW_PROGRAM_CONSTANTS  0x20000000
+#define _NEW_BUFFER_OBJECT      0x40000000
 #define _NEW_ALL ~0
 /*@}*/
 
@@ -2969,6 +2980,12 @@ struct __GLcontextRec
 
    /** software compression/decompression supported or not */
    GLboolean Mesa_DXTn;
+
+   /** 
+    * Use dp4 (rather than mul/mad) instructions for position
+    * transformation?
+    */
+   GLboolean mvp_with_dp4;
 
    /** Core tnl module support */
    struct gl_tnl_module TnlModule;

@@ -39,9 +39,6 @@
 #include "texenvprogram.h"
 
 
-#define MAX_TERMS 4
-
-
 /*
  * Note on texture units:
  *
@@ -95,11 +92,11 @@ struct state_key {
 
       GLuint NumArgsRGB:3;
       GLuint ModeRGB:5;
-      struct mode_opt OptRGB[MAX_TERMS];
+      struct mode_opt OptRGB[MAX_COMBINER_TERMS];
 
       GLuint NumArgsA:3;
       GLuint ModeA:5;
-      struct mode_opt OptA[MAX_TERMS];
+      struct mode_opt OptA[MAX_COMBINER_TERMS];
    } unit[8];
 };
 
@@ -389,7 +386,7 @@ static void make_state_key( GLcontext *ctx,  struct state_key *key )
       key->unit[i].ScaleShiftRGB = texUnit->_CurrentCombine->ScaleShiftRGB;
       key->unit[i].ScaleShiftA = texUnit->_CurrentCombine->ScaleShiftA;
 
-      for (j = 0; j < MAX_TERMS; j++) {
+      for (j = 0; j < MAX_COMBINER_TERMS; j++) {
          key->unit[i].OptRGB[j].Operand =
 	    translate_operand(texUnit->_CurrentCombine->OperandRGB[j]);
          key->unit[i].OptA[j].Operand =
@@ -666,9 +663,8 @@ static void emit_arg( struct prog_src_register *reg,
    reg->File = ureg.file;
    reg->Index = ureg.idx;
    reg->Swizzle = ureg.swz;
-   reg->NegateBase = ureg.negatebase ? 0xf : 0x0;
+   reg->Negate = ureg.negatebase ? NEGATE_XYZW : NEGATE_NONE;
    reg->Abs = ureg.abs;
-   reg->NegateAbs = ureg.negateabs;
 }
 
 static void emit_dst( struct prog_dst_register *dst,
@@ -972,11 +968,11 @@ static struct ureg emit_combine( struct texenv_fragment_program *p,
 				 GLuint mode,
 				 const struct mode_opt *opt)
 {
-   struct ureg src[MAX_TERMS];
+   struct ureg src[MAX_COMBINER_TERMS];
    struct ureg tmp, half;
    GLuint i;
 
-   assert(nr <= MAX_TERMS);
+   assert(nr <= MAX_COMBINER_TERMS);
 
    tmp = undef; /* silence warning (bug 5318) */
 

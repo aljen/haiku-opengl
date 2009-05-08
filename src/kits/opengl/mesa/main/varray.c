@@ -63,21 +63,10 @@ update_array(GLcontext *ctx, struct gl_client_array *array,
    array->StrideB = stride ? stride : elementSize;
    array->Normalized = normalized;
    array->Ptr = (const GLubyte *) ptr;
-#if FEATURE_ARB_vertex_buffer_object
+   array->_ElementSize = elementSize;
+
    _mesa_reference_buffer_object(ctx, &array->BufferObj,
                                  ctx->Array.ArrayBufferObj);
-
-   /* Compute the index of the last array element that's inside the buffer.
-    * Later in glDrawArrays we'll check if start + count > _MaxElement to
-    * be sure we won't go out of bounds.
-    */
-   if (ctx->Array.ArrayBufferObj->Name)
-      array->_MaxElement = ((GLsizeiptrARB) ctx->Array.ArrayBufferObj->Size
-                            - (GLsizeiptrARB) array->Ptr + array->StrideB
-                            - elementSize) / array->StrideB;
-   else
-#endif
-      array->_MaxElement = 2 * 1000 * 1000 * 1000; /* just a big number */
 
    ctx->NewState |= _NEW_ARRAY;
    ctx->Array.NewState |= dirtyBit;

@@ -286,7 +286,7 @@ aa_transform_inst(struct tgsi_transform_context *ctx,
       ctx->emit_instruction(ctx, &newInst);
 #endif
 
-      /* SGT t0.y, t0.xxxx, t0.wwww;  # bool b = d > 1 (NOTE t0.w == 1) */
+      /* SGT t0.y, t0.xxxx, tex.wwww;  # bool b = d > 1 (NOTE tex.w == 1) */
       newInst = tgsi_default_full_instruction();
       newInst.Instruction.Opcode = TGSI_OPCODE_SGT;
       newInst.Instruction.NumDstRegs = 1;
@@ -757,6 +757,7 @@ draw_aapoint_stage(struct draw_context *draw)
       goto fail;
 
    aapoint->stage.draw = draw;
+   aapoint->stage.name = "aapoint";
    aapoint->stage.next = NULL;
    aapoint->stage.point = aapoint_first_point;
    aapoint->stage.line = draw_pipe_passthrough_line;

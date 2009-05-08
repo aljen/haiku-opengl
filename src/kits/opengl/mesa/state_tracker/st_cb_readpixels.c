@@ -42,13 +42,15 @@
 #include "pipe/p_defines.h"
 #include "pipe/p_inlines.h"
 #include "util/u_tile.h"
+
 #include "st_context.h"
 #include "st_cb_bitmap.h"
 #include "st_cb_readpixels.h"
 #include "st_cb_fbo.h"
 #include "st_format.h"
 #include "st_public.h"
-
+#include "st_texture.h"
+#include "st_inlines.h"
 
 /**
  * Special case for reading stencil buffer.
@@ -56,7 +58,8 @@
  */
 void
 st_read_stencil_pixels(GLcontext *ctx, GLint x, GLint y,
-                       GLsizei width, GLsizei height, GLenum type,
+                       GLsizei width, GLsizei height,
+                       GLenum format, GLenum type,
                        const struct gl_pixelstore_attrib *packing,
                        GLvoid *pixels)
 {
@@ -68,12 +71,15 @@ st_read_stencil_pixels(GLcontext *ctx, GLint x, GLint y,
    GLint j;
 
    if (st_fb_orientation(ctx->DrawBuffer) == Y_0_TOP) {
-      y = ctx->DrawBuffer->Height - y - 1;
+      y = ctx->DrawBuffer->Height - y - height;
    }
 
    /* Create a read transfer from the renderbuffer's texture */
-   pt = screen->get_tex_transfer(screen, strb->texture,  0, 0, 0,
-                                 PIPE_TRANSFER_READ, x, y, width, height);
+
+   pt = st_cond_flush_get_tex_transfer(st_context(ctx), strb->texture,
+				       0, 0, 0,
+				       PIPE_TRANSFER_READ, x, y,
+				       width, height);
 
    /* map the stencil buffer */
    stmap = screen->transfer_map(screen, pt);
@@ -84,7 +90,8 @@ st_read_stencil_pixels(GLcontext *ctx, GLint x, GLint y,
    /* process image row by row */
    for (j = 0; j < height; j++) {
       GLvoid *dest;
-      GLstencil values[MAX_WIDTH];
+      GLstencil sValues[MAX_WIDTH];
+      GLfloat zValues[MAX_WIDTH];
       GLint srcY;
 
       if (st_fb_orientation(ctx->DrawBuffer) == Y_0_TOP) {
@@ -94,29 +101,47 @@ st_read_stencil_pixels(GLcontext *ctx, GLint x, GLint y,
          srcY = j;
       }
 
-      /* get stencil values */
+      /* get stencil (and Z) values */
       switch (pt->format) {
       case PIPE_FORMAT_S8_UNORM:
          {
             const ubyte *src = stmap + srcY * pt->stride;
-            memcpy(values, src, width);
+            memcpy(sValues, src, width);
          }
          break;
       case PIPE_FORMAT_S8Z24_UNORM:
-         {
+         if (format == GL_DEPTH_STENCIL) {
+            const uint *src = (uint *) (stmap + srcY * pt->stride);
+            const GLfloat scale = 1.0 / (0xffffff);
+            GLint k;
+            for (k = 0; k < width; k++) {
+               sValues[k] = src[k] >> 24;
+               zValues[k] = (src[k] & 0xffffff) * scale;
+            }
+         }
+         else {
             const uint *src = (uint *) (stmap + srcY * pt->stride);
             GLint k;
             for (k = 0; k < width; k++) {
-               values[k] = src[k] >> 24;
+               sValues[k] = src[k] >> 24;
             }
          }
          break;
       case PIPE_FORMAT_Z24S8_UNORM:
-         {
+         if (format == GL_DEPTH_STENCIL) {
+            const uint *src = (uint *) (stmap + srcY * pt->stride);
+            const GLfloat scale = 1.0 / (0xffffff);
+            GLint k;
+            for (k = 0; k < width; k++) {
+               sValues[k] = src[k] & 0xff;
+               zValues[k] = (src[k] >> 8) * scale;
+            }
+         }
+         else {
             const uint *src = (uint *) (stmap + srcY * pt->stride);
             GLint k;
             for (k = 0; k < width; k++) {
-               values[k] = src[k] & 0xff;
+               sValues[k] = src[k] & 0xff;
             }
          }
          break;
@@ -126,11 +151,15 @@ st_read_stencil_pixels(GLcontext *ctx, GLint x, GLint y,
 
       /* store */
       dest = _mesa_image_address2d(packing, pixels, width, height,
-                                   GL_STENCIL_INDEX, type, j, 0);
-
-      _mesa_pack_stencil_span(ctx, width, type, dest, values, packing);
+                                   format, type, j, 0);
+      if (format == GL_DEPTH_STENCIL) {
+         _mesa_pack_depth_stencil_span(ctx, width, dest,
+                                       zValues, sValues, packing);
+      }
+      else {
+         _mesa_pack_stencil_span(ctx, width, type, dest, sValues, packing);
+      }
    }
-
 
    /* unmap the stencil buffer */
    screen->transfer_unmap(screen, pt);
@@ -216,8 +245,10 @@ st_fast_readpixels(GLcontext *ctx, struct st_renderbuffer *strb,
          y = strb->texture->height[0] - y - height;
       }
 
-      trans = screen->get_tex_transfer(screen, strb->texture, 0, 0, 0,
-                                       PIPE_TRANSFER_READ, x, y, width, height);
+      trans = st_cond_flush_get_tex_transfer(st_context(ctx), strb->texture,
+					     0, 0, 0,
+					     PIPE_TRANSFER_READ, x, y,
+					     width, height);
       if (!trans) {
          return GL_FALSE;
       }
@@ -326,11 +357,12 @@ st_readpixels(GLcontext *ctx, GLint x, GLint y, GLsizei width, GLsizei height,
    if (!dest)
       return;
 
-   /* make sure rendering has completed */
    st_flush(ctx->st, PIPE_FLUSH_RENDER_CACHE, NULL);
 
-   if (format == GL_STENCIL_INDEX) {
-      st_read_stencil_pixels(ctx, x, y, width, height, type, pack, dest);
+   if (format == GL_STENCIL_INDEX ||
+       format == GL_DEPTH_STENCIL) {
+      st_read_stencil_pixels(ctx, x, y, width, height,
+                             format, type, pack, dest);
       return;
    }
    else if (format == GL_DEPTH_COMPONENT) {
@@ -369,8 +401,10 @@ st_readpixels(GLcontext *ctx, GLint x, GLint y, GLsizei width, GLsizei height,
    }
 
    /* Create a read transfer from the renderbuffer's texture */
-   trans = screen->get_tex_transfer(screen, strb->texture,  0, 0, 0,
-                                    PIPE_TRANSFER_READ, x, y, width, height);
+   trans = st_cond_flush_get_tex_transfer(st_context(ctx), strb->texture,
+					  0, 0, 0,
+					  PIPE_TRANSFER_READ, x, y,
+					  width, height);
 
    /* determine bottom-to-top vs. top-to-bottom order */
    if (st_fb_orientation(ctx->ReadBuffer) == Y_0_TOP) {
@@ -404,6 +438,33 @@ st_readpixels(GLcontext *ctx, GLint x, GLint y, GLsizei width, GLsizei height,
                y += yStep;
                for (j = 0; j < width; j++) {
                   zfloat[j] = (float) (scale * (ztemp[j] & 0xffffff));
+               }
+               _mesa_pack_depth_span(ctx, width, dst, type,
+                                     zfloat, &clippedPacking);
+               dst += dstStride;
+            }
+         }
+         else {
+            /* untested, but simple: */
+            assert(format == GL_DEPTH_STENCIL_EXT);
+            for (i = 0; i < height; i++) {
+               pipe_get_tile_raw(trans, 0, y, width, 1, dst, 0);
+               y += yStep;
+               dst += dstStride;
+            }
+         }
+      }
+      else if (trans->format == PIPE_FORMAT_Z24S8_UNORM ||
+               trans->format == PIPE_FORMAT_Z24X8_UNORM) {
+         if (format == GL_DEPTH_COMPONENT) {
+            for (i = 0; i < height; i++) {
+               GLuint ztemp[MAX_WIDTH];
+               GLfloat zfloat[MAX_WIDTH];
+               const double scale = 1.0 / ((1 << 24) - 1);
+               pipe_get_tile_raw(trans, 0, y, width, 1, ztemp, 0);
+               y += yStep;
+               for (j = 0; j < width; j++) {
+                  zfloat[j] = (float) (scale * ((ztemp[j] >> 8) & 0xffffff));
                }
                _mesa_pack_depth_span(ctx, width, dst, type,
                                      zfloat, &clippedPacking);

@@ -229,7 +229,7 @@ struct pipe_context*
 haiku_softpipe_context_create(struct pipe_screen *screen)
 {
 	TRACE("haiku_softpipe_context_create> screen = %p\n", screen);
-	struct pipe_context *pipe = softpipe_create(screen, screen->winsys, NULL);
+	struct pipe_context *pipe = softpipe_create(screen);
 	return pipe;
 }
 
@@ -247,8 +247,6 @@ haiku_softpipe_flush_frontbuffer(struct pipe_screen *screen,
 
 	buffer = haiku_softpipe_buffer(texture->buffer);
 
-	int32 width = surface->width;
-	int32 height = surface->height;
 	int32 bitsLength = get_bitmap_bits_length(bitmap);
 	copy_bitmap_bits(bitmap, buffer->data, bitsLength);
 }
