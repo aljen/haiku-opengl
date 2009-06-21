@@ -493,6 +493,7 @@ StaticLibrary libmesa.a :
 	u_timed_winsys.c
 	u_upload_mgr.c
 
+	# arch specific assembly optimization
 	$(arch_sources)
 ;
 

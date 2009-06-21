@@ -233,12 +233,19 @@ void st_destroy_context( struct st_context *st )
    struct pipe_context *pipe = st->pipe;
    struct cso_context *cso = st->cso_context;
    GLcontext *ctx = st->ctx;
+   GLuint i;
 
    /* need to unbind and destroy CSO objects before anything else */
    cso_release_all(st->cso_context);
 
    st_reference_fragprog(st, &st->fp, NULL);
    st_reference_vertprog(st, &st->vp, NULL);
+
+   /* release framebuffer surfaces */
+   for (i = 0; i < PIPE_MAX_COLOR_BUFS; i++) {
+      pipe_surface_reference(&st->state.framebuffer.cbufs[i], NULL);
+   }
+   pipe_surface_reference(&st->state.framebuffer.zsbuf, NULL);
 
    _mesa_delete_program_cache(st->ctx, st->pixel_xfer.cache);
 
@@ -256,9 +263,10 @@ void st_destroy_context( struct st_context *st )
 }
 
 
-void st_make_current(struct st_context *st,
-                     struct st_framebuffer *draw,
-                     struct st_framebuffer *read)
+GLboolean
+st_make_current(struct st_context *st,
+                struct st_framebuffer *draw,
+                struct st_framebuffer *read)
 {
    /* Call this periodically to detect when the user has begun using
     * GL rendering from multiple threads.
@@ -267,7 +275,8 @@ void st_make_current(struct st_context *st,
 
    if (st) {
       GLboolean firstTime = st->ctx->FirstTimeCurrent;
-      _mesa_make_current(st->ctx, &draw->Base, &read->Base);
+      if(!_mesa_make_current(st->ctx, &draw->Base, &read->Base))
+         return GL_FALSE;
       /* Need to initialize viewport here since draw->Base->Width/Height
        * will still be zero at this point.
        * This could be improved, but would require rather extensive work
@@ -279,9 +288,10 @@ void st_make_current(struct st_context *st,
          _mesa_set_scissor(st->ctx, 0, 0, w, h);
 
       }
+      return GL_TRUE;
    }
    else {
-      _mesa_make_current(NULL, NULL, NULL);
+      return _mesa_make_current(NULL, NULL, NULL);
    }
 }
 

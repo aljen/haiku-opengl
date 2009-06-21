@@ -352,6 +352,9 @@ typedef enum
    OPCODE_EVAL_P1,
    OPCODE_EVAL_P2,
 
+   /* GL_EXT_provoking_vertex */
+   OPCODE_PROVOKING_VERTEX,
+
    /* The following three are meta instructions */
    OPCODE_ERROR,                /* raise compiled-in error */
    OPCODE_CONTINUE,
@@ -4883,7 +4886,7 @@ save_Attr1fNV(GLenum attr, GLfloat x)
       n[2].f = x;
    }
 
-   ASSERT(attr < MAX_VERTEX_PROGRAM_ATTRIBS);
+   ASSERT(attr < MAX_VERTEX_GENERIC_ATTRIBS);
    ctx->ListState.ActiveAttribSize[attr] = 1;
    ASSIGN_4V(ctx->ListState.CurrentAttrib[attr], x, 0, 0, 1);
 
@@ -4905,7 +4908,7 @@ save_Attr2fNV(GLenum attr, GLfloat x, GLfloat y)
       n[3].f = y;
    }
 
-   ASSERT(attr < MAX_VERTEX_PROGRAM_ATTRIBS);
+   ASSERT(attr < MAX_VERTEX_GENERIC_ATTRIBS);
    ctx->ListState.ActiveAttribSize[attr] = 2;
    ASSIGN_4V(ctx->ListState.CurrentAttrib[attr], x, y, 0, 1);
 
@@ -4928,7 +4931,7 @@ save_Attr3fNV(GLenum attr, GLfloat x, GLfloat y, GLfloat z)
       n[4].f = z;
    }
 
-   ASSERT(attr < MAX_VERTEX_PROGRAM_ATTRIBS);
+   ASSERT(attr < MAX_VERTEX_GENERIC_ATTRIBS);
    ctx->ListState.ActiveAttribSize[attr] = 3;
    ASSIGN_4V(ctx->ListState.CurrentAttrib[attr], x, y, z, 1);
 
@@ -4952,7 +4955,7 @@ save_Attr4fNV(GLenum attr, GLfloat x, GLfloat y, GLfloat z, GLfloat w)
       n[5].f = w;
    }
 
-   ASSERT(attr < MAX_VERTEX_PROGRAM_ATTRIBS);
+   ASSERT(attr < MAX_VERTEX_GENERIC_ATTRIBS);
    ctx->ListState.ActiveAttribSize[attr] = 4;
    ASSIGN_4V(ctx->ListState.CurrentAttrib[attr], x, y, z, w);
 
@@ -4974,7 +4977,7 @@ save_Attr1fARB(GLenum attr, GLfloat x)
       n[2].f = x;
    }
 
-   ASSERT(attr < MAX_VERTEX_ATTRIBS);
+   ASSERT(attr < MAX_VERTEX_GENERIC_ATTRIBS);
    ctx->ListState.ActiveAttribSize[attr] = 1;
    ASSIGN_4V(ctx->ListState.CurrentAttrib[attr], x, 0, 0, 1);
 
@@ -4996,7 +4999,7 @@ save_Attr2fARB(GLenum attr, GLfloat x, GLfloat y)
       n[3].f = y;
    }
 
-   ASSERT(attr < MAX_VERTEX_ATTRIBS);
+   ASSERT(attr < MAX_VERTEX_GENERIC_ATTRIBS);
    ctx->ListState.ActiveAttribSize[attr] = 2;
    ASSIGN_4V(ctx->ListState.CurrentAttrib[attr], x, y, 0, 1);
 
@@ -5019,7 +5022,7 @@ save_Attr3fARB(GLenum attr, GLfloat x, GLfloat y, GLfloat z)
       n[4].f = z;
    }
 
-   ASSERT(attr < MAX_VERTEX_ATTRIBS);
+   ASSERT(attr < MAX_VERTEX_GENERIC_ATTRIBS);
    ctx->ListState.ActiveAttribSize[attr] = 3;
    ASSIGN_4V(ctx->ListState.CurrentAttrib[attr], x, y, z, 1);
 
@@ -5043,7 +5046,7 @@ save_Attr4fARB(GLenum attr, GLfloat x, GLfloat y, GLfloat z, GLfloat w)
       n[5].f = w;
    }
 
-   ASSERT(attr < MAX_VERTEX_ATTRIBS);
+   ASSERT(attr < MAX_VERTEX_GENERIC_ATTRIBS);
    ctx->ListState.ActiveAttribSize[attr] = 4;
    ASSIGN_4V(ctx->ListState.CurrentAttrib[attr], x, y, z, w);
 
@@ -5506,7 +5509,7 @@ index_error(void)
 static void GLAPIENTRY
 save_VertexAttrib1fNV(GLuint index, GLfloat x)
 {
-   if (index < MAX_VERTEX_PROGRAM_ATTRIBS)
+   if (index < MAX_NV_VERTEX_PROGRAM_INPUTS)
       save_Attr1fNV(index, x);
    else
       index_error();
@@ -5515,7 +5518,7 @@ save_VertexAttrib1fNV(GLuint index, GLfloat x)
 static void GLAPIENTRY
 save_VertexAttrib1fvNV(GLuint index, const GLfloat * v)
 {
-   if (index < MAX_VERTEX_PROGRAM_ATTRIBS)
+   if (index < MAX_NV_VERTEX_PROGRAM_INPUTS)
       save_Attr1fNV(index, v[0]);
    else
       index_error();
@@ -5524,7 +5527,7 @@ save_VertexAttrib1fvNV(GLuint index, const GLfloat * v)
 static void GLAPIENTRY
 save_VertexAttrib2fNV(GLuint index, GLfloat x, GLfloat y)
 {
-   if (index < MAX_VERTEX_PROGRAM_ATTRIBS)
+   if (index < MAX_NV_VERTEX_PROGRAM_INPUTS)
       save_Attr2fNV(index, x, y);
    else
       index_error();
@@ -5533,7 +5536,7 @@ save_VertexAttrib2fNV(GLuint index, GLfloat x, GLfloat y)
 static void GLAPIENTRY
 save_VertexAttrib2fvNV(GLuint index, const GLfloat * v)
 {
-   if (index < MAX_VERTEX_PROGRAM_ATTRIBS)
+   if (index < MAX_NV_VERTEX_PROGRAM_INPUTS)
       save_Attr2fNV(index, v[0], v[1]);
    else
       index_error();
@@ -5542,7 +5545,7 @@ save_VertexAttrib2fvNV(GLuint index, const GLfloat * v)
 static void GLAPIENTRY
 save_VertexAttrib3fNV(GLuint index, GLfloat x, GLfloat y, GLfloat z)
 {
-   if (index < MAX_VERTEX_PROGRAM_ATTRIBS)
+   if (index < MAX_NV_VERTEX_PROGRAM_INPUTS)
       save_Attr3fNV(index, x, y, z);
    else
       index_error();
@@ -5551,7 +5554,7 @@ save_VertexAttrib3fNV(GLuint index, GLfloat x, GLfloat y, GLfloat z)
 static void GLAPIENTRY
 save_VertexAttrib3fvNV(GLuint index, const GLfloat * v)
 {
-   if (index < MAX_VERTEX_PROGRAM_ATTRIBS)
+   if (index < MAX_NV_VERTEX_PROGRAM_INPUTS)
       save_Attr3fNV(index, v[0], v[1], v[2]);
    else
       index_error();
@@ -5561,7 +5564,7 @@ static void GLAPIENTRY
 save_VertexAttrib4fNV(GLuint index, GLfloat x, GLfloat y,
                       GLfloat z, GLfloat w)
 {
-   if (index < MAX_VERTEX_PROGRAM_ATTRIBS)
+   if (index < MAX_NV_VERTEX_PROGRAM_INPUTS)
       save_Attr4fNV(index, x, y, z, w);
    else
       index_error();
@@ -5570,7 +5573,7 @@ save_VertexAttrib4fNV(GLuint index, GLfloat x, GLfloat y,
 static void GLAPIENTRY
 save_VertexAttrib4fvNV(GLuint index, const GLfloat * v)
 {
-   if (index < MAX_VERTEX_PROGRAM_ATTRIBS)
+   if (index < MAX_NV_VERTEX_PROGRAM_INPUTS)
       save_Attr4fNV(index, v[0], v[1], v[2], v[3]);
    else
       index_error();
@@ -5582,7 +5585,7 @@ save_VertexAttrib4fvNV(GLuint index, const GLfloat * v)
 static void GLAPIENTRY
 save_VertexAttrib1fARB(GLuint index, GLfloat x)
 {
-   if (index < MAX_VERTEX_ATTRIBS)
+   if (index < MAX_VERTEX_GENERIC_ATTRIBS)
       save_Attr1fARB(index, x);
    else
       index_error();
@@ -5591,7 +5594,7 @@ save_VertexAttrib1fARB(GLuint index, GLfloat x)
 static void GLAPIENTRY
 save_VertexAttrib1fvARB(GLuint index, const GLfloat * v)
 {
-   if (index < MAX_VERTEX_ATTRIBS)
+   if (index < MAX_VERTEX_GENERIC_ATTRIBS)
       save_Attr1fARB(index, v[0]);
    else
       index_error();
@@ -5600,7 +5603,7 @@ save_VertexAttrib1fvARB(GLuint index, const GLfloat * v)
 static void GLAPIENTRY
 save_VertexAttrib2fARB(GLuint index, GLfloat x, GLfloat y)
 {
-   if (index < MAX_VERTEX_ATTRIBS)
+   if (index < MAX_VERTEX_GENERIC_ATTRIBS)
       save_Attr2fARB(index, x, y);
    else
       index_error();
@@ -5609,7 +5612,7 @@ save_VertexAttrib2fARB(GLuint index, GLfloat x, GLfloat y)
 static void GLAPIENTRY
 save_VertexAttrib2fvARB(GLuint index, const GLfloat * v)
 {
-   if (index < MAX_VERTEX_ATTRIBS)
+   if (index < MAX_VERTEX_GENERIC_ATTRIBS)
       save_Attr2fARB(index, v[0], v[1]);
    else
       index_error();
@@ -5618,7 +5621,7 @@ save_VertexAttrib2fvARB(GLuint index, const GLfloat * v)
 static void GLAPIENTRY
 save_VertexAttrib3fARB(GLuint index, GLfloat x, GLfloat y, GLfloat z)
 {
-   if (index < MAX_VERTEX_ATTRIBS)
+   if (index < MAX_VERTEX_GENERIC_ATTRIBS)
       save_Attr3fARB(index, x, y, z);
    else
       index_error();
@@ -5627,7 +5630,7 @@ save_VertexAttrib3fARB(GLuint index, GLfloat x, GLfloat y, GLfloat z)
 static void GLAPIENTRY
 save_VertexAttrib3fvARB(GLuint index, const GLfloat * v)
 {
-   if (index < MAX_VERTEX_ATTRIBS)
+   if (index < MAX_VERTEX_GENERIC_ATTRIBS)
       save_Attr3fARB(index, v[0], v[1], v[2]);
    else
       index_error();
@@ -5637,7 +5640,7 @@ static void GLAPIENTRY
 save_VertexAttrib4fARB(GLuint index, GLfloat x, GLfloat y, GLfloat z,
                        GLfloat w)
 {
-   if (index < MAX_VERTEX_ATTRIBS)
+   if (index < MAX_VERTEX_GENERIC_ATTRIBS)
       save_Attr4fARB(index, x, y, z, w);
    else
       index_error();
@@ -5646,7 +5649,7 @@ save_VertexAttrib4fARB(GLuint index, GLfloat x, GLfloat y, GLfloat z,
 static void GLAPIENTRY
 save_VertexAttrib4fvARB(GLuint index, const GLfloat * v)
 {
-   if (index < MAX_VERTEX_ATTRIBS)
+   if (index < MAX_VERTEX_GENERIC_ATTRIBS)
       save_Attr4fARB(index, v[0], v[1], v[2], v[3]);
    else
       index_error();
@@ -5703,6 +5706,25 @@ save_BlitFramebufferEXT(GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1,
    }
 }
 #endif
+
+
+/** GL_EXT_provoking_vertex */
+static void GLAPIENTRY
+save_ProvokingVertexEXT(GLenum mode)
+{
+   GET_CURRENT_CONTEXT(ctx);
+   Node *n;
+   ASSERT_OUTSIDE_SAVE_BEGIN_END_AND_FLUSH(ctx);
+   n = ALLOC_INSTRUCTION(ctx, OPCODE_PROVOKING_VERTEX, 1);
+   if (n) {
+      n[1].e = mode;
+   }
+   if (ctx->ExecuteFlag) {
+      /*CALL_ProvokingVertexEXT(ctx->Exec, (mode));*/
+      _mesa_ProvokingVertexEXT(mode);
+   }
+}
+
 
 
 /**
@@ -6269,6 +6291,9 @@ execute_list(GLcontext *ctx, GLuint list)
          case OPCODE_SHADE_MODEL:
             CALL_ShadeModel(ctx->Exec, (n[1].e));
             break;
+         case OPCODE_PROVOKING_VERTEX:
+            CALL_ProvokingVertexEXT(ctx->Exec, (n[1].e));
+            break;
          case OPCODE_STENCIL_FUNC:
             CALL_StencilFunc(ctx->Exec, (n[1].e, n[2].i, n[3].ui));
             break;
@@ -6806,10 +6831,10 @@ _mesa_NewList(GLuint name, GLenum mode)
 
    /* Reset acumulated list state:
     */
-   for (i = 0; i < VERT_ATTRIB_MAX; i++)
+   for (i = 0; i < Elements(ctx->ListState.ActiveAttribSize); i++)
       ctx->ListState.ActiveAttribSize[i] = 0;
 
-   for (i = 0; i < MAT_ATTRIB_MAX; i++)
+   for (i = 0; i < Elements(ctx->ListState.ActiveMaterialSize); i++)
       ctx->ListState.ActiveMaterialSize[i] = 0;
 
    ctx->Driver.CurrentSavePrimitive = PRIM_UNKNOWN;
@@ -8238,6 +8263,18 @@ _mesa_init_dlist_table(struct _glapi_table *table)
    SET_ProgramEnvParameters4fvEXT(table, save_ProgramEnvParameters4fvEXT);
    SET_ProgramLocalParameters4fvEXT(table, save_ProgramLocalParameters4fvEXT);
 #endif
+
+   /* ARB 50. GL_ARB_map_buffer_range */
+#if FEATURE_ARB_map_buffer_range
+   SET_MapBufferRange(table, _mesa_MapBufferRange); /* no dlist save */
+   SET_FlushMappedBufferRange(table, _mesa_FlushMappedBufferRange); /* no dl */
+#endif
+
+   /* ARB 59. GL_ARB_copy_buffer */
+   SET_CopyBufferSubData(table, _mesa_CopyBufferSubData); /* no dlist save */
+
+   /* 364. GL_EXT_provoking_vertex */
+   SET_ProvokingVertexEXT(table, save_ProvokingVertexEXT);
 }
 
 
@@ -8472,6 +8509,11 @@ print_list(GLcontext *ctx, GLuint list)
             break;
          case OPCODE_EVAL_P2:
             _mesa_printf("EVAL_P2 %d %d\n", n[1].i, n[2].i);
+            break;
+
+         case OPCODE_PROVOKING_VERTEX:
+            _mesa_printf("ProvokingVertex %s\n",
+                         _mesa_lookup_enum_by_nr(n[1].ui));
             break;
 
             /*

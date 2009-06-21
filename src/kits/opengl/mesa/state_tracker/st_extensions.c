@@ -138,6 +138,8 @@ void st_init_extensions(struct st_context *st)
    /*
     * Extensions that are supported by all Gallium drivers:
     */
+   ctx->Extensions.ARB_copy_buffer = GL_TRUE;
+   ctx->Extensions.ARB_map_buffer_range = GL_TRUE;
    ctx->Extensions.ARB_multisample = GL_TRUE;
    ctx->Extensions.ARB_fragment_program = GL_TRUE;
    ctx->Extensions.ARB_texture_border_clamp = GL_TRUE; /* XXX temp */
@@ -161,15 +163,20 @@ void st_init_extensions(struct st_context *st)
    ctx->Extensions.EXT_multi_draw_arrays = GL_TRUE;
    ctx->Extensions.EXT_pixel_buffer_object = GL_TRUE;
    ctx->Extensions.EXT_point_parameters = GL_TRUE;
+   ctx->Extensions.EXT_provoking_vertex = GL_TRUE;
    ctx->Extensions.EXT_secondary_color = GL_TRUE;
    ctx->Extensions.EXT_stencil_wrap = GL_TRUE;
    ctx->Extensions.EXT_texture_env_add = GL_TRUE;
    ctx->Extensions.EXT_texture_env_combine = GL_TRUE;
    ctx->Extensions.EXT_texture_env_dot3 = GL_TRUE;
    ctx->Extensions.EXT_texture_lod_bias = GL_TRUE;
+   ctx->Extensions.EXT_vertex_array_bgra = GL_TRUE;
+
+   ctx->Extensions.APPLE_vertex_array_object = GL_TRUE;
 
    ctx->Extensions.NV_blend_square = GL_TRUE;
    ctx->Extensions.NV_texgen_reflection = GL_TRUE;
+   ctx->Extensions.NV_texture_env_combine4 = GL_TRUE;
 
    ctx->Extensions.SGI_color_matrix = GL_TRUE;
    ctx->Extensions.SGIS_generate_mipmap = GL_TRUE;

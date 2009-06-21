@@ -455,7 +455,7 @@ _mesa_init_current(GLcontext *ctx)
    GLuint i;
 
    /* Init all to (0,0,0,1) */
-   for (i = 0; i < VERT_ATTRIB_MAX; i++) {
+   for (i = 0; i < Elements(ctx->Current.Attrib); i++) {
       ASSIGN_4V( ctx->Current.Attrib[i], 0.0, 0.0, 0.0, 1.0 );
    }
 
@@ -592,6 +592,9 @@ _mesa_init_constants(GLcontext *ctx)
    /* GL_ATI_envmap_bumpmap */
    ctx->Const.SupportedBumpUnits = SUPPORTED_ATI_BUMP_UNITS;
 
+   /* GL_EXT_provoking_vertex */
+   ctx->Const.QuadsFollowProvokingVertexConvention = GL_TRUE;
+
    /* sanity checks */
    ASSERT(ctx->Const.MaxTextureUnits == MIN2(ctx->Const.MaxTextureImageUnits,
                                              ctx->Const.MaxTextureCoordUnits));
@@ -602,6 +605,10 @@ _mesa_init_constants(GLcontext *ctx)
    ASSERT(MAX_NV_VERTEX_PROGRAM_TEMPS <= MAX_PROGRAM_TEMPS);
    ASSERT(MAX_NV_VERTEX_PROGRAM_INPUTS <= VERT_ATTRIB_MAX);
    ASSERT(MAX_NV_VERTEX_PROGRAM_OUTPUTS <= VERT_RESULT_MAX);
+
+   /* check that we don't exceed various 32-bit bitfields */
+   ASSERT(VERT_RESULT_MAX <= 32);
+   ASSERT(FRAG_ATTRIB_MAX <= 32);
 }
 
 
@@ -1005,10 +1012,17 @@ _mesa_free_context_data( GLcontext *ctx )
    _mesa_free_query_data(ctx);
 #endif
 
-#if FEATURE_ARB_vertex_buffer_object
-   _mesa_delete_buffer_object(ctx, ctx->Array.NullBufferObj);
-#endif
    _mesa_delete_array_object(ctx, ctx->Array.DefaultArrayObj);
+
+#if FEATURE_ARB_pixel_buffer_object
+   _mesa_reference_buffer_object(ctx, &ctx->Pack.BufferObj, NULL);
+   _mesa_reference_buffer_object(ctx, &ctx->Unpack.BufferObj, NULL);
+#endif
+
+#if FEATURE_ARB_vertex_buffer_object
+   _mesa_reference_buffer_object(ctx, &ctx->Array.ArrayBufferObj, NULL);
+   _mesa_reference_buffer_object(ctx, &ctx->Array.ElementArrayBufferObj, NULL);
+#endif
 
    /* free dispatch tables */
    _mesa_free(ctx->Exec);
@@ -1258,7 +1272,7 @@ initialize_framebuffer_size(GLcontext *ctx, GLframebuffer *fb)
  * \param drawBuffer  the drawing framebuffer
  * \param readBuffer  the reading framebuffer
  */
-void
+GLboolean
 _mesa_make_current( GLcontext *newCtx, GLframebuffer *drawBuffer,
                     GLframebuffer *readBuffer )
 {
@@ -1271,14 +1285,14 @@ _mesa_make_current( GLcontext *newCtx, GLframebuffer *drawBuffer,
       if (!check_compatible(newCtx, drawBuffer)) {
          _mesa_warning(newCtx,
               "MakeCurrent: incompatible visuals for context and drawbuffer");
-         return;
+         return GL_FALSE;
       }
    }
    if (newCtx && readBuffer && newCtx->WinSysReadBuffer != readBuffer) {
       if (!check_compatible(newCtx, readBuffer)) {
          _mesa_warning(newCtx,
               "MakeCurrent: incompatible visuals for context and readbuffer");
-         return;
+         return GL_FALSE;
       }
    }
 
@@ -1383,6 +1397,8 @@ _mesa_make_current( GLcontext *newCtx, GLframebuffer *drawBuffer,
 	 newCtx->FirstTimeCurrent = GL_FALSE;
       }
    }
+   
+   return GL_TRUE;
 }
 
 
@@ -1397,14 +1413,21 @@ _mesa_share_state(GLcontext *ctx, GLcontext *ctxToShare)
 {
    if (ctx && ctxToShare && ctx->Shared && ctxToShare->Shared) {
       struct gl_shared_state *oldSharedState = ctx->Shared;
+      GLint RefCount;
 
       ctx->Shared = ctxToShare->Shared;
+      
+      _glthread_LOCK_MUTEX(ctx->Shared->Mutex);
       ctx->Shared->RefCount++;
+      _glthread_UNLOCK_MUTEX(ctx->Shared->Mutex);
 
       update_default_objects(ctx);
 
-      oldSharedState->RefCount--;
-      if (oldSharedState->RefCount == 0) {
+      _glthread_LOCK_MUTEX(oldSharedState->Mutex);
+      RefCount = --oldSharedState->RefCount;
+      _glthread_UNLOCK_MUTEX(oldSharedState->Mutex);
+
+      if (RefCount == 0) {
          _mesa_free_shared_state(ctx, oldSharedState);
       }
 

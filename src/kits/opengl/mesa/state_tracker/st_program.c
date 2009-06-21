@@ -49,24 +49,10 @@
 #include "cso_cache/cso_context.h"
 
 
-#define ST_MAX_SHADER_TOKENS 4096
+#define ST_MAX_SHADER_TOKENS (8 * 1024)
 
 
 #define TGSI_DEBUG 0
-
-
-/** XXX we should use the version of this from u_memory.h but including
- * that header causes symbol collisions.
- */
-static INLINE void *
-mem_dup(const void *src, uint size)
-{
-   void *dup = _mesa_malloc(size);
-   if (dup)
-      _mesa_memcpy(dup, src, size);
-   return dup;
-}
-
 
 
 /**
@@ -84,7 +70,7 @@ st_translate_vertex_program(struct st_context *st,
                             const ubyte *outputSemanticIndex)
 {
    struct pipe_context *pipe = st->pipe;
-   struct tgsi_token tokens[ST_MAX_SHADER_TOKENS];
+   struct tgsi_token *tokens;
    GLuint defaultOutputMapping[VERT_RESULT_MAX];
    struct pipe_shader_state vs;
    GLuint attr, i;
@@ -101,6 +87,13 @@ st_translate_vertex_program(struct st_context *st,
 
    GLbitfield input_flags[MAX_PROGRAM_INPUTS];
    GLbitfield output_flags[MAX_PROGRAM_OUTPUTS];
+
+   tokens =  (struct tgsi_token *)MALLOC(ST_MAX_SHADER_TOKENS * sizeof *tokens);
+   if(!tokens) {
+      /* FIXME: propagate error to the caller */
+      assert(0);
+      return;
+   }
 
    memset(&vs, 0, sizeof(vs));
    memset(input_flags, 0, sizeof(input_flags));
@@ -297,9 +290,6 @@ st_translate_vertex_program(struct st_context *st,
       }
    }
 
-   assert(vs_output_semantic_name[0] == TGSI_SEMANTIC_POSITION);
-
-
    if (outputMapping) {
       /* find max output slot referenced to compute vs_num_outputs */
       GLuint maxSlot = 0;
@@ -312,6 +302,26 @@ st_translate_vertex_program(struct st_context *st,
    else {
       outputMapping = defaultOutputMapping;
    }
+
+#if 0 /* debug */
+   {
+      GLuint i;
+      printf("outputMapping? %d\n", outputMapping ? 1 : 0);
+      if (outputMapping) {
+         printf("attr -> slot\n");
+         for (i = 0; i < 16;  i++) {
+            printf(" %2d       %3d\n", i, outputMapping[i]);
+         }
+      }
+      printf("slot    sem_name  sem_index\n");
+      for (i = 0; i < vs_num_outputs; i++) {
+         printf(" %2d         %d         %d\n",
+                i,
+                vs_output_semantic_name[i],
+                vs_output_semantic_index[i]);
+      }
+   }
+#endif
 
    /* free old shader state, if any */
    if (stvp->state.tokens) {
@@ -347,7 +357,9 @@ st_translate_vertex_program(struct st_context *st,
    assert(num_tokens < ST_MAX_SHADER_TOKENS);
 
    vs.tokens = (struct tgsi_token *)
-      mem_dup(tokens, num_tokens * sizeof(tokens[0]));
+      _mesa_realloc(tokens,
+                    ST_MAX_SHADER_TOKENS * sizeof *tokens,
+                    num_tokens * sizeof *tokens);
 
    stvp->num_inputs = vs_num_inputs;
    stvp->state = vs; /* struct copy */
@@ -375,7 +387,7 @@ st_translate_fragment_program(struct st_context *st,
                               const GLuint inputMapping[])
 {
    struct pipe_context *pipe = st->pipe;
-   struct tgsi_token tokens[ST_MAX_SHADER_TOKENS];
+   struct tgsi_token *tokens;
    GLuint outputMapping[FRAG_RESULT_MAX];
    GLuint defaultInputMapping[FRAG_ATTRIB_MAX];
    struct pipe_shader_state fs;
@@ -394,6 +406,13 @@ st_translate_fragment_program(struct st_context *st,
 
    GLbitfield input_flags[MAX_PROGRAM_INPUTS];
    GLbitfield output_flags[MAX_PROGRAM_OUTPUTS];
+
+   tokens =  (struct tgsi_token *)MALLOC(ST_MAX_SHADER_TOKENS * sizeof *tokens);
+   if(!tokens) {
+      /* FIXME: propagate error to the caller */
+      assert(0);
+      return;
+   }
 
    memset(&fs, 0, sizeof(fs));
    memset(input_flags, 0, sizeof(input_flags));
@@ -536,7 +555,9 @@ st_translate_fragment_program(struct st_context *st,
    assert(num_tokens < ST_MAX_SHADER_TOKENS);
 
    fs.tokens = (struct tgsi_token *)
-      mem_dup(tokens, num_tokens * sizeof(tokens[0]));
+      _mesa_realloc(tokens,
+                    ST_MAX_SHADER_TOKENS * sizeof *tokens,
+                    num_tokens * sizeof *tokens);
 
    stfp->state = fs; /* struct copy */
    stfp->driver_shader = pipe->create_fs_state(pipe, &fs);

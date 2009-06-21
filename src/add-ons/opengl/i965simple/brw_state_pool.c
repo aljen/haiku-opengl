@@ -103,8 +103,9 @@ static void brw_destroy_pool( struct brw_context *brw,
 {
    struct brw_mem_pool *pool = &brw->pool[pool_id];
 
-   pipe_buffer_reference( &pool->brw->pipe.screen,
-			  pool->buffer );
+   pipe_buffer_reference( pool->brw->pipe.screen,
+			  &pool->buffer,
+			  NULL );
 }
 
 

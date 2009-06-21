@@ -19,8 +19,6 @@ UseHeaders [ FDirName $(SUBDIR) mesa shader ] ;
 UseHeaders [ FDirName $(SUBDIR) mesa swrast ] ;
 UseHeaders [ FDirName $(SUBDIR) mesa swrast_setup ] ;
 
-SEARCH_SOURCE += [ FDirName $(SUBDIR) hgl ] ;
-
 {
 	local defines ;
 	defines = BEOS_THREADS GNU_ASSEMBLER ;

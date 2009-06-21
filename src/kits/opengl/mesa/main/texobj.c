@@ -281,7 +281,8 @@ valid_texture_object(const struct gl_texture_object *tex)
       _mesa_problem(NULL, "invalid reference to a deleted texture object");
       return GL_FALSE;
    default:
-      _mesa_problem(NULL, "invalid texture object Target value");
+      _mesa_problem(NULL, "invalid texture object Target 0x%x, Id = %u",
+                    tex->Target, tex->Name);
       return GL_FALSE;
    }
 }
@@ -944,6 +945,7 @@ _mesa_BindTexture( GLenum target, GLuint texName )
    struct gl_texture_unit *texUnit = &ctx->Texture.Unit[unit];
    struct gl_texture_object *newTexObj = NULL, *defaultTexObj = NULL;
    GLint targetIndex;
+   GLboolean early_out = GL_FALSE;
    ASSERT_OUTSIDE_BEGIN_END(ctx);
 
    if (MESA_VERBOSE & (VERBOSE_API|VERBOSE_TEXTURE))
@@ -996,6 +998,17 @@ _mesa_BindTexture( GLenum target, GLuint texName )
    }
 
    assert(valid_texture_object(newTexObj));
+
+   _glthread_LOCK_MUTEX(ctx->Shared->Mutex);
+   if ((ctx->Shared->RefCount == 1)
+       && (newTexObj == texUnit->CurrentTex[targetIndex])) {
+      early_out = GL_TRUE;
+   }
+   _glthread_UNLOCK_MUTEX(ctx->Shared->Mutex);
+
+   if (early_out) {
+      return;
+   }
 
    /* flush before changing binding */
    FLUSH_VERTICES(ctx, _NEW_TEXTURE);

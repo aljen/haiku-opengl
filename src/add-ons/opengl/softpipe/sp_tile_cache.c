@@ -32,8 +32,6 @@
  *    Brian Paul
  */
 
-#include <OS.h>
-#include <sys/time.h>
 #include "pipe/p_inlines.h"
 #include "util/u_memory.h"
 #include "util/u_tile.h"
@@ -117,24 +115,15 @@ struct softpipe_tile_cache *
 sp_create_tile_cache( struct pipe_screen *screen )
 {
    struct softpipe_tile_cache *tc;
-//   fprintf(stderr, "%s> softpipe_tile_cache sizeof(%d)\n", __FUNCTION__, sizeof(struct softpipe_tile_cache));
    uint pos;
-   bigtime_t beg, end;
 
-//   beg = system_time();
    tc = CALLOC_STRUCT( softpipe_tile_cache );
-//   end = system_time();
-//   fprintf(stderr, "%s> allocation time: %Ld\n", __FUNCTION__, end - beg);
    if (tc) {
       tc->screen = screen;
-//      beg = time(NULL);
       for (pos = 0; pos < NUM_ENTRIES; pos++) {
          tc->entries[pos].x =
          tc->entries[pos].y = -1;
       }
-//      end = time(NULL);
-//      fprintf(stderr, "%s> for(%d) time: %f\n", __FUNCTION__,
-//		NUM_ENTRIES, difftime(end, beg));
    }
    return tc;
 }

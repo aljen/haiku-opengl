@@ -444,7 +444,8 @@ static void flush_spans( struct setup_context *setup )
             mask |= MASK_TOP_RIGHT;
          if (x+1 >= xleft1 && x+1 < xright1)
             mask |= MASK_BOTTOM_RIGHT;
-         EMIT_QUAD( setup, x, setup->span.y, mask );
+         if (mask)
+            EMIT_QUAD( setup, x, setup->span.y, mask );
       }
       break;
 
@@ -458,7 +459,8 @@ static void flush_spans( struct setup_context *setup )
             mask |= MASK_TOP_LEFT;
          if (x+1 >= xleft0 && x+1 < xright0)
             mask |= MASK_TOP_RIGHT;
-         EMIT_QUAD( setup, x, setup->span.y, mask );
+         if (mask)
+            EMIT_QUAD( setup, x, setup->span.y, mask );
       }
       break;
 
@@ -472,7 +474,8 @@ static void flush_spans( struct setup_context *setup )
             mask |= MASK_BOTTOM_LEFT;
          if (x+1 >= xleft1 && x+1 < xright1)
             mask |= MASK_BOTTOM_RIGHT;
-         EMIT_QUAD( setup, x, setup->span.y, mask );
+         if (mask)
+            EMIT_QUAD( setup, x, setup->span.y, mask );
       }
       break;
 
@@ -504,6 +507,8 @@ static void print_vertex(const struct setup_context *setup,
 #endif
 
 /**
+ * Sort the vertices from top to bottom order, setting up the triangle
+ * edge fields (ebot, emaj, etop).
  * \return FALSE if coords are inf/nan (cull the tri), TRUE otherwise
  */
 static boolean setup_sort_vertices( struct setup_context *setup,
@@ -1049,7 +1054,10 @@ setup_line_coefficients(struct setup_context *setup,
    float area;
 
    /* use setup->vmin, vmax to point to vertices */
-   setup->vprovoke = v1;
+   if (softpipe->rasterizer->flatshade_first)
+      setup->vprovoke = v0;
+   else
+      setup->vprovoke = v1;
    setup->vmin = v0;
    setup->vmax = v1;
 

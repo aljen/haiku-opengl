@@ -770,6 +770,7 @@ struct gl_light_attrib
 
    GLboolean Enabled;			/**< Lighting enabled flag */
    GLenum ShadeModel;			/**< GL_FLAT or GL_SMOOTH */
+   GLenum ProvokingVertex;              /**< GL_EXT_provoking_vertex */
    GLenum ColorMaterialFace;		/**< GL_FRONT, BACK or FRONT_AND_BACK */
    GLenum ColorMaterialMode;		/**< GL_AMBIENT, GL_DIFFUSE, etc */
    GLbitfield ColorMaterialBitmask;	/**< bitmask formed from Face and Mode */
@@ -1498,14 +1499,17 @@ struct gl_buffer_object
 {
    GLint RefCount;
    GLuint Name;
-   GLenum Usage;
-   GLenum Access;
-   GLvoid *Pointer;          /**< Only valid while buffer is mapped */
-   GLintptr Offset;          /**< mapped offset */
-   GLsizeiptr Length;        /**< mapped length */
-   GLsizeiptrARB Size;       /**< Size of storage in bytes */
-   GLubyte *Data;            /**< Location of storage either in RAM or VRAM. */
-   GLboolean Written;        /**< Ever written to? (for debugging) */
+   GLenum Usage;        /**< GL_STREAM_DRAW_ARB, GL_STREAM_READ_ARB, etc. */
+   GLsizeiptrARB Size;  /**< Size of buffer storage in bytes */
+   GLubyte *Data;       /**< Location of storage either in RAM or VRAM. */
+   /** Fields describing a mapped buffer */
+   /*@{*/
+   GLbitfield AccessFlags; /**< Mask of GL_MAP_x_BIT flags */
+   GLvoid *Pointer;     /**< User-space address of mapping */
+   GLintptr Offset;     /**< Mapped offset */
+   GLsizeiptr Length;   /**< Mapped length */
+   /*@}*/
+   GLboolean Written;   /**< Ever written to? (for debugging) */
 };
 
 
@@ -1544,7 +1548,7 @@ struct gl_client_array
    GLuint _ElementSize;         /**< size of each element in bytes */
 
    struct gl_buffer_object *BufferObj;/**< GL_ARB_vertex_buffer_object */
-   GLuint _MaxElement;          /**< max element index into array buffer */
+   GLuint _MaxElement;          /**< max element index into array buffer + 1 */
 };
 
 
@@ -1557,9 +1561,13 @@ struct gl_array_object
    /** Name of the array object as received from glGenVertexArrayAPPLE. */
    GLuint Name;
 
+   GLint RefCount;
+   _glthread_Mutex Mutex;
+
    /** Conventional vertex arrays */
    /*@{*/
    struct gl_client_array Vertex;
+   struct gl_client_array Weight;
    struct gl_client_array Normal;
    struct gl_client_array Color;
    struct gl_client_array SecondaryColor;
@@ -1570,11 +1578,22 @@ struct gl_array_object
    struct gl_client_array PointSize;
    /*@}*/
 
-   /** Generic arrays for vertex programs/shaders */
-   struct gl_client_array VertexAttrib[VERT_ATTRIB_MAX];
+   /**
+    * Generic arrays for vertex programs/shaders.
+    * For NV vertex programs, these attributes alias and take priority
+    * over the conventional attribs above.  For ARB vertex programs and
+    * GLSL vertex shaders, these attributes are separate.
+    */
+   struct gl_client_array VertexAttrib[MAX_VERTEX_GENERIC_ATTRIBS];
 
    /** Mask of _NEW_ARRAY_* values indicating which arrays are enabled */
    GLbitfield _Enabled;
+
+   /**
+    * Min of all enabled arrays' _MaxElement.  When arrays reside inside VBOs
+    * we can determine the max legal (in bounds) glDrawElements array index.
+    */
+   GLuint _MaxElement;
 };
 
 
@@ -1583,7 +1602,10 @@ struct gl_array_object
  */
 struct gl_array_attrib
 {
+   /** Currently bound array object. See _mesa_BindVertexArrayAPPLE() */
    struct gl_array_object *ArrayObj;
+
+   /** The default vertex array object */
    struct gl_array_object *DefaultArrayObj;
 
    GLint ActiveTexture;		/**< Client Active Texture */
@@ -1593,11 +1615,9 @@ struct gl_array_attrib
    GLbitfield NewState;		/**< mask of _NEW_ARRAY_* values */
 
 #if FEATURE_ARB_vertex_buffer_object
-   struct gl_buffer_object *NullBufferObj;
    struct gl_buffer_object *ArrayBufferObj;
    struct gl_buffer_object *ElementArrayBufferObj;
 #endif
-   GLuint _MaxElement;          /* Min of all enabled array's maxes */
 };
 
 
@@ -2064,6 +2084,8 @@ struct gl_shared_state
    GLuint TextureStateStamp;	        /**< state notification for shared tex */
    /*@}*/
 
+   /** Default buffer object for vertex arrays that aren't in VBOs */
+   struct gl_buffer_object *NullBufferObj;
 
    /**
     * \name Vertex/fragment programs
@@ -2403,6 +2425,9 @@ struct gl_constants
    GLuint MaxVarying;  /**< Number of float[4] varying parameters */
 
    GLbitfield SupportedBumpUnits; /**> units supporting GL_ATI_envmap_bumpmap as targets */
+
+   /**< GL_EXT_provoking_vertex */
+   GLboolean QuadsFollowProvokingVertexConvention;
 };
 
 
@@ -2413,6 +2438,7 @@ struct gl_constants
 struct gl_extensions
 {
    GLboolean dummy;  /* don't remove this! */
+   GLboolean ARB_copy_buffer;
    GLboolean ARB_depth_texture;
    GLboolean ARB_draw_buffers;
    GLboolean ARB_fragment_program;
@@ -2421,6 +2447,7 @@ struct gl_extensions
    GLboolean ARB_framebuffer_object;
    GLboolean ARB_half_float_pixel;
    GLboolean ARB_imaging;
+   GLboolean ARB_map_buffer_range;
    GLboolean ARB_multisample;
    GLboolean ARB_multitexture;
    GLboolean ARB_occlusion_query;
@@ -2471,6 +2498,7 @@ struct gl_extensions
    GLboolean EXT_pixel_buffer_object;
    GLboolean EXT_point_parameters;
    GLboolean EXT_polygon_offset;
+   GLboolean EXT_provoking_vertex;
    GLboolean EXT_rescale_normal;
    GLboolean EXT_shadow_funcs;
    GLboolean EXT_secondary_color;
@@ -2938,6 +2966,9 @@ struct __GLcontextRec
    struct gl_shader_state Shader; /**< GLSL shader object state */
 
    struct gl_query_state Query;  /**< occlusion, timer queries */
+
+   struct gl_buffer_object *CopyReadBuffer; /**< GL_ARB_copy_buffer */
+   struct gl_buffer_object *CopyWriteBuffer; /**< GL_ARB_copy_buffer */
    /*@}*/
 
 #if FEATURE_EXT_framebuffer_object

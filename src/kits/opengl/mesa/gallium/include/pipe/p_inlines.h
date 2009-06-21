@@ -117,7 +117,7 @@ pipe_buffer_write(struct pipe_screen *screen,
    assert(offset + size <= buf->size);
    assert(size);
 
-   map = (uint8_t*)pipe_buffer_map_range(screen, buf, offset, size, PIPE_BUFFER_USAGE_CPU_WRITE);
+   map = pipe_buffer_map_range(screen, buf, offset, size, PIPE_BUFFER_USAGE_CPU_WRITE);
    assert(map);
    if(map) {
       memcpy(map + offset, data, size);
@@ -138,7 +138,7 @@ pipe_buffer_read(struct pipe_screen *screen,
    assert(offset + size <= buf->size);
    assert(size);
 
-   map = (uint8_t*)pipe_buffer_map_range(screen, buf, offset, size, PIPE_BUFFER_USAGE_CPU_READ);
+   map = pipe_buffer_map_range(screen, buf, offset, size, PIPE_BUFFER_USAGE_CPU_READ);
    assert(map);
    if(map) {
       memcpy(data, map + offset, size);
