@@ -11,7 +11,6 @@
 #ifndef __HSP_WINSYS_H__
 #define __HSP_WINSYS_H__
 
-#include "pipe/internal/p_winsys_screen.h"
 #include "pipe/p_compiler.h"
 #include "hsp_bitmap_wrapper.h"
 

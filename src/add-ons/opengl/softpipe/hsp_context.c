@@ -25,6 +25,8 @@
 
 //#define TRACE_HSP_CONTEXT
 #ifdef TRACE_HSP_CONTEXT
+#   include "tr_screen.h"
+#   include "tr_context.h"
 #	define TRACE(x...)	fprintf(stderr, x);
 #else
 #	define TRACE(x...)
@@ -67,6 +69,7 @@ hsp_create_layer_context(Bitmap *bitmap, int layerPlane)
 	time_t beg, end;
 	total_beg = time(NULL);
 	struct hsp_context *ctx = NULL;
+	struct pipe_screen *screen = NULL;
 	GLvisual *visual = NULL;
 	struct pipe_context *pipe = NULL;
 	uint ctxId = 0;
@@ -84,13 +87,21 @@ hsp_create_layer_context(Bitmap *bitmap, int layerPlane)
 	ctx = CALLOC_STRUCT(hsp_context);
 	if (!ctx) {
 		TRACE("%s> can't alloc hsp_context!\n", __FUNCTION__);
-		return 0;
+		goto no_ctx;
 	}
 
 	ctx->bitmap = bitmap;
 	ctx->colorSpace = get_bitmap_color_space(bitmap);
 	ctx->draw = NULL;
 	ctx->read = NULL;
+
+	screen = hsp_dev->screen;
+
+#ifdef DEBUG
+    /* Unwrap screen */
+    if (hsp_dev->trace_running)
+        screen = trace_screen(screen)->screen;
+#endif
 
 	ulong options = hsp_dev->options;
 
@@ -129,15 +140,20 @@ hsp_create_layer_context(Bitmap *bitmap, int layerPlane)
 
 	if (!visual) {
 		TRACE("%s> can't create mesa visual!\n", __FUNCTION__);
-		goto fail;
+		goto no_ctx_id;
 	}
 
-	pipe = hsp_dev->hsp_winsys->create_context(hsp_dev->screen);
+	pipe = hsp_dev->hsp_winsys->create_context(screen);
 
 	if (!pipe) {
 		TRACE("%s> can't create pipe!\n", __FUNCTION__);
-		goto fail;
+		goto no_pipe;
 	}
+
+#ifdef DEBUG
+    if (hsp_dev->trace_running)
+        pipe = trace_context_create(hsp_dev->screen, pipe);
+#endif
 
 	assert(!pipe->priv);
 	pipe->priv = bitmap;
@@ -146,20 +162,18 @@ hsp_create_layer_context(Bitmap *bitmap, int layerPlane)
 	if (!ctx->st) {
 		TRACE("%s> can't create mesa statetracker context!\n",
 			__FUNCTION__);
-		goto fail;
+		goto no_st_ctx;
 	}
 
 	ctx->st->ctx->DriverCtx = ctx;
 
 	pipe_mutex_lock(hsp_dev->mutex);
-	{
-		uint64 i;
-		for (i = 0; i < HSP_CONTEXT_MAX; i++) {
-			if (hsp_dev->ctx_array[i].ctx == NULL) {
-				hsp_dev->ctx_array[i].ctx = ctx;
-				ctxId = i + 1;
-				break;
-			}
+	uint64 i;
+	for (i = 0; i < HSP_CONTEXT_MAX; i++) {
+		if (hsp_dev->ctx_array[i].ctx == NULL) {
+			hsp_dev->ctx_array[i].ctx = ctx;
+			ctxId = i + 1;
+			break;
 		}
 	}
 	pipe_mutex_unlock(hsp_dev->mutex);
@@ -167,15 +181,20 @@ hsp_create_layer_context(Bitmap *bitmap, int layerPlane)
 	if (ctxId != 0)
 		return ctxId;
 
-fail:
-	if (visual)
-		_mesa_destroy_visual(visual);
-
-	if (pipe)
-		pipe->destroy(pipe);
-
-	FREE(ctx);
-	return 0;
+no_ctx_id:
+	TRACE("%s> no_ctx_id!\n", __FUNCTION__);
+    _mesa_destroy_visual(visual);
+    st_destroy_context(ctx->st);
+    goto no_pipe; /* st_context_destroy already destroy pipe */
+no_st_ctx:
+	TRACE("%s> no_st_ctx!\n", __FUNCTION__);
+    pipe->destroy(pipe);
+no_pipe:
+	TRACE("%s> no_pipe!\n", __FUNCTION__);
+    FREE(ctx);
+no_ctx:
+	TRACE("%s> no_ctx!\n", __FUNCTION__);
+    return 0;
 }
 
 bool

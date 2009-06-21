@@ -29,6 +29,7 @@ struct hsp_device
 	} ctx_array[HSP_CONTEXT_MAX];
 #ifdef DEBUG
 	unsigned long memdb_no;
+	bool trace_running;
 #endif
 };
 

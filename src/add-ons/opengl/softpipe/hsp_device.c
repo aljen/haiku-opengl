@@ -106,7 +106,6 @@ hsp_cleanup(void)
 	hsp_dev->screen->destroy(hsp_dev->screen);
 
 #ifdef DEBUG
-#error DEBUG DEFINED ;P
 	debug_memory_end(hsp_dev->memdbg_no);
 #endif
 	hsp_dev = NULL;

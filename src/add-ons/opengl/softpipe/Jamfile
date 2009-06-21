@@ -24,6 +24,7 @@ if $(TARGET_PLATFORM) != haiku {
 
 UsePrivateHeaders interface opengl ;
 
+UseHeaders [ FDirName $(HAIKU_TOP) src add-ons opengl trace ] ;
 UseHeaders [ FDirName $(HAIKU_TOP) src kits opengl hgl ] ;
 UseHeaders [ FDirName $(HAIKU_TOP) src kits opengl mesa ] ;
 UseHeaders [ FDirName $(HAIKU_TOP) src kits opengl mesa main ] ;
